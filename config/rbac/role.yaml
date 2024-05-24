@@ -1,0 +1,32 @@
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: manager-role
+rules:
+- apiGroups:
+  - apps.utho.com
+  resources:
+  - uthoapplications
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.utho.com
+  resources:
+  - uthoapplications/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.utho.com
+  resources:
+  - uthoapplications/status
+  verbs:
+  - get
+  - patch
+  - update

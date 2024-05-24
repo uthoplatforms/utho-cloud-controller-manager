@@ -1,0 +1,27 @@
+# permissions for end users to view uthoapplications.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: clusterrole
+    app.kubernetes.io/instance: uthoapplication-viewer-role
+    app.kubernetes.io/component: rbac
+    app.kubernetes.io/created-by: utho-lb-controller
+    app.kubernetes.io/part-of: utho-lb-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: uthoapplication-viewer-role
+rules:
+- apiGroups:
+  - apps.utho.com
+  resources:
+  - uthoapplications
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - apps.utho.com
+  resources:
+  - uthoapplications/status
+  verbs:
+  - get

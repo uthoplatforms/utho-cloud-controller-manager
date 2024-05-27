@@ -23,6 +23,7 @@ import (
 	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	predicate "sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -36,7 +37,7 @@ import (
 
 const (
 	finalizerID          = "utho-app-operator"
-	errorRequeueDuration = 30 * time.Minute
+	errorRequeueDuration = 5 * time.Second
 )
 
 // UthoApplicationReconciler reconciles a UthoApplication object
@@ -71,95 +72,90 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		return ctrl.Result{RequeueAfter: errorRequeueDuration}, err
 	}
-	if app.Status.ObservedGeneration != app.ObjectMeta.Generation {
-		app.Status.ObservedGeneration = app.ObjectMeta.Generation
-		if err := r.Status().Update(ctx, app); err != nil {
-			l.Error(err, "Couldn't Set Observed Generation")
-			return ctrl.Result{}, errors.Wrap(err, "Couldn't Set Observed Generation")
-		}
-
-		// Is the Object Marked for Deletion
-		if !app.ObjectMeta.DeletionTimestamp.IsZero() {
-			l.Info("Application Marked for Deletion")
-			if containsString(app.ObjectMeta.Finalizers, finalizerID) {
-				if err := r.deleteExternalResources(ctx, app, &l); err != nil {
-					return ctrl.Result{}, nil
-				}
-				app.ObjectMeta.Finalizers = removeString(app.ObjectMeta.Finalizers, finalizerID)
-				if err := r.Update(ctx, app); err != nil {
-					return ctrl.Result{}, errors.Wrap(err, "Could Not Remove Finalizer")
-				}
+	// Is the Object Marked for Deletion
+	if !app.ObjectMeta.DeletionTimestamp.IsZero() {
+		l.Info("Application Marked for Deletion")
+		if containsString(app.ObjectMeta.Finalizers, finalizerID) {
+			if err := r.deleteExternalResources(ctx, app, &l); err != nil {
+				return ctrl.Result{}, nil
 			}
-			return ctrl.Result{}, nil
-		}
-
-		// Add Finalizer if doesn't exists already
-		if !containsString(app.ObjectMeta.Finalizers, finalizerID) {
-			app.ObjectMeta.Finalizers = append(app.ObjectMeta.Finalizers, finalizerID)
+			app.ObjectMeta.Finalizers = removeString(app.ObjectMeta.Finalizers, finalizerID)
 			if err := r.Update(ctx, app); err != nil {
-				return ctrl.Result{}, errors.Wrap(err, "Could Not Add Finalizer")
+				return ctrl.Result{}, errors.Wrap(err, "Could Not Remove Finalizer")
 			}
 		}
-
-		if app.Status.Phase == "" {
-			app.Status.Phase = appsv1alpha1.LBPendingPhase
-			if err := r.Status().Update(ctx, app); err != nil {
-				return ctrl.Result{}, errors.Wrap(err, "Unable to Add LB Pending Status.")
-			}
-
-			err := r.CreateUthoLoadBalancer(ctx, app, &l)
-			if err != nil {
-				l.Error(err, "Unable to Create LB")
-				app.Status.Phase = appsv1alpha1.LBAttachmentErrorPhase
-				if err := r.Status().Update(ctx, app); err != nil {
-					return ctrl.Result{}, errors.Wrap(err, "Unale to Update LB Error Status")
-				}
-				return ctrl.Result{RequeueAfter: errorRequeueDuration}, errors.Wrap(err, "Unable to Create LB")
-			}
-
-			return ctrl.Result{}, nil
-		} else if app.Status.Phase == appsv1alpha1.RunningPhase {
-
-		}
-		return ctrl.Result{}, nil
-	} else {
-		l.Info("Status Field Updated. No Need to do anything")
 		return ctrl.Result{}, nil
 	}
+
+	// Add Finalizer if doesn't exists already
+	if !containsString(app.ObjectMeta.Finalizers, finalizerID) {
+		app.ObjectMeta.Finalizers = append(app.ObjectMeta.Finalizers, finalizerID)
+		if err := r.Update(ctx, app); err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "Could Not Add Finalizer")
+		}
+	}
+
+	if app.Status.Phase == "" || app.Status.Phase == appsv1alpha1.LBPendingPhase || app.Status.Phase == appsv1alpha1.LBAttachmentErrorPhase {
+		err := r.createExternalResources(ctx, app, &l)
+		if err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	} else if app.Status.Phase == appsv1alpha1.RunningPhase {
+		// Update Logic
+	} else if app.Status.LoadBalancerID == "" {
+		// Check Lower Resources
+	}
+	// Create from Scratch
+	err := r.createExternalResources(ctx, app, &l)
+	if err != nil {
+		return ctrl.Result{RequeueAfter: errorRequeueDuration}, err
+	}
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *UthoApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	pred := predicate.GenerationChangedPredicate{}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.UthoApplication{}).
+		WithEventFilter(pred).
 		Complete(r)
 }
 
 func (r *UthoApplicationReconciler) createExternalResources(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	l.Info("Creating External Resources")
+	app.Status.Phase = appsv1alpha1.LBPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return err
+	}
+	l.Info("Creating Load Balancer")
+	err := r.CreateUthoLoadBalancer(ctx, app, l)
+	if err != nil {
+		l.Error(err, "Unable to Create LB")
+		app.Status.Phase = appsv1alpha1.LBAttachmentErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return err
+		}
+		return err
+	}
+	app.Status.Phase = appsv1alpha1.TGPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return err
+	}
+
+	l.Info("Creating Target Groups")
+	if err = r.CreateTargetGroups(ctx, app, l); err != nil {
+		l.Error(err, "Unable to Create Target Groups")
+		app.Status.Phase = appsv1alpha1.TGAttachmentErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return err
+		}
+		return err
+	}
 	return nil
 }
 func (r *UthoApplicationReconciler) deleteExternalResources(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	l.Info("Deleting External Resources")
 	return nil
-}
-
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
-func removeString(slice []string, s string) []string {
-	var result []string
-	for _, item := range slice {
-		if item == s {
-			continue
-		}
-		result = append(result, item)
-	}
-	return result
 }

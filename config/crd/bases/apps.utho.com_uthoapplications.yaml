@@ -36,7 +36,7 @@ spec:
           spec:
             description: UthoApplicationSpec defines the desired state of UthoApplication
             properties:
-              load_balancer:
+              loadBalancer:
                 description: Foo is an example field of UthoApplication. Edit uthoapplication_types.go
                   to remove/update
                 properties:
@@ -51,54 +51,56 @@ spec:
                 - dcslug
                 - name
                 type: object
-              target_groups:
+              targetGroups:
                 items:
                   properties:
-                    healht_check_timeout:
-                      type: string
                     health_check_interval:
-                      type: string
+                      format: int64
+                      type: integer
                     health_check_path:
                       type: string
                     health_check_protocol:
                       type: string
+                    health_check_timeout:
+                      format: int64
+                      type: integer
                     healthy_threshold:
-                      type: string
+                      format: int64
+                      type: integer
                     name:
                       type: string
+                    port:
+                      format: int64
+                      type: integer
                     protocol:
                       type: string
-                    service:
-                      type: string
                     unhealthy_threshold:
-                      type: string
+                      format: int64
+                      type: integer
                   required:
-                  - healht_check_timeout
                   - health_check_interval
                   - health_check_path
                   - health_check_protocol
+                  - health_check_timeout
                   - healthy_threshold
                   - name
+                  - port
                   - protocol
-                  - service
                   - unhealthy_threshold
                   type: object
                 type: array
             required:
-            - load_balancer
-            - target_groups
+            - loadBalancer
+            - targetGroups
             type: object
           status:
             description: UthoApplicationStatus defines the observed state of UthoApplication
             properties:
               load_balancer_id:
-                type: string
-              observed_generation:
                 description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
                   of cluster Important: Run "make" to regenerate code after modifying
                   this file'
-                format: int64
-                type: integer
+                type: string
               phase:
                 type: string
               target_group_id:
@@ -107,9 +109,7 @@ spec:
                 type: array
             required:
             - load_balancer_id
-            - observed_generation
             - phase
-            - target_group_id
             type: object
         type: object
     served: true

@@ -29,8 +29,8 @@ type UthoApplicationSpec struct {
 	// Important: Run "make" to regenerate code after modifying this file
 
 	// Foo is an example field of UthoApplication. Edit uthoapplication_types.go to remove/update
-	LoadBalancer LoadBalancer  `json:"load_balancer"`
-	TargetGroups []TargetGroup `json:"target_groups"`
+	LoadBalancer LoadBalancer  `json:"loadBalancer"`
+	TargetGroups []TargetGroup `json:"targetGroups"`
 }
 
 type LoadBalancer struct {
@@ -45,11 +45,11 @@ type TargetGroup struct {
 	Protocol            string `json:"protocol"`
 	HealthCheckPath     string `json:"health_check_path"`
 	HealthCheckProtocol string `json:"health_check_protocol"`
-	HealthCheckInterval string `json:"health_check_interval"`
-	HealthCheckTimeout  string `json:"healht_check_timeout"`
-	HealthyThreshold    string `json:"healthy_threshold"`
-	UnhealthyThreshold  string `json:"unhealthy_threshold"`
-	Service             string `json:"service"`
+	HealthCheckInterval int64  `json:"health_check_interval"`
+	HealthCheckTimeout  int64  `json:"health_check_timeout"`
+	HealthyThreshold    int64  `json:"healthy_threshold"`
+	UnhealthyThreshold  int64  `json:"unhealthy_threshold"`
+	Port                int64  `json:"port"`
 }
 
 type StatusPhase string
@@ -74,10 +74,9 @@ const (
 type UthoApplicationStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
-	ObservedGeneration int64       `json:"observed_generation"`
-	LoadBalancerID     string      `json:"load_balancer_id"`
-	TargetGroupsID     []string    `json:"target_group_id"`
-	Phase              StatusPhase `json:"phase"`
+	LoadBalancerID string      `json:"load_balancer_id"`
+	TargetGroupsID []string    `json:"target_group_id,omitempty"`
+	Phase          StatusPhase `json:"phase"`
 }
 
 //+kubebuilder:object:root=true

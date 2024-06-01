@@ -34,10 +34,21 @@ type UthoApplicationSpec struct {
 }
 
 type LoadBalancer struct {
+	Frontend Frontend `json:"frontend"`
 	// +kubebuilder:default:=application
 	Type   string `json:"type,omitempty"`
 	Dcslug string `json:"dcslug"`
 	Name   string `json:"name"`
+}
+
+type Frontend struct {
+	Name            string `json:"name"`
+	Algorithm       string `json:"algorithm"`
+	Protocol        string `json:"protocol"`
+	Port            int64  `json:"port"`
+	CertificateName string `json:"certificateName,omitempty"`
+	RedirectHttps   bool   `json:"redirectHttps,omitempty"`
+	Cookie          bool   `json:"cookie,omitempty"`
 }
 
 type TargetGroup struct {
@@ -59,12 +70,19 @@ const (
 	LBPendingPhase           StatusPhase = "LB_PENDING"
 	LBCreatedPhase           StatusPhase = "LB_CREATED"
 	LBErrorPhase             StatusPhase = "LB_ERROR"
+	LBDeletedPhase           StatusPhase = "LB_DELETED"
+	LBDeletionErrorPhase     StatusPhase = "LB_DELETION_ERROR"
 	TGPendingPhase           StatusPhase = "TG_PENDING"
 	TGCreatedPhase           StatusPhase = "TG_CREATED"
 	TGErrorPhase             StatusPhase = "TG_ERROR"
+	TGDeletedPhase           StatusPhase = "TG_DELETED"
+	TGDeletionErrorPhase     StatusPhase = "TG_DELETION_ERROR"
 	LBAttachmentPendingPhase StatusPhase = "LB_ATTACHMENT_PENDING"
 	LBAttachmentCreatedPhase StatusPhase = "LB__ATTACHMENT_CREATED"
 	LBAttachmentErrorPhase   StatusPhase = "LB_ATTACHMENT_ERROR"
+	FrontendPendingPhase     StatusPhase = "FRONTEND_PENDING"
+	FrontendCreatedPhase     StatusPhase = "FRONTEND_CREATED"
+	FrontendErrorPhase       StatusPhase = "FRONTEND_ERROR"
 	TGAttachmentPendingPhase StatusPhase = "TG_ATTACHMENT_PENDING"
 	TGAttachmentCreatedPhase StatusPhase = "TG_ATTACHMENT_CREATED"
 	TGAttachmentErrorPhase   StatusPhase = "TG_ATTACHMENT_PHASE"
@@ -75,6 +93,7 @@ type UthoApplicationStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	LoadBalancerID string      `json:"load_balancer_id"`
+	FrontendID     string      `json:"frontend_id"`
 	TargetGroupsID []string    `json:"target_group_id,omitempty"`
 	Phase          StatusPhase `json:"phase"`
 }

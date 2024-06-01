@@ -42,6 +42,29 @@ spec:
                 properties:
                   dcslug:
                     type: string
+                  frontend:
+                    properties:
+                      algorithm:
+                        type: string
+                      certificateName:
+                        type: string
+                      cookie:
+                        type: boolean
+                      name:
+                        type: string
+                      port:
+                        format: int64
+                        type: integer
+                      protocol:
+                        type: string
+                      redirectHttps:
+                        type: boolean
+                    required:
+                    - algorithm
+                    - name
+                    - port
+                    - protocol
+                    type: object
                   name:
                     type: string
                   type:
@@ -49,6 +72,7 @@ spec:
                     type: string
                 required:
                 - dcslug
+                - frontend
                 - name
                 type: object
               targetGroups:
@@ -96,6 +120,8 @@ spec:
           status:
             description: UthoApplicationStatus defines the observed state of UthoApplication
             properties:
+              frontend_id:
+                type: string
               load_balancer_id:
                 description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
                   of cluster Important: Run "make" to regenerate code after modifying
@@ -108,6 +134,7 @@ spec:
                   type: string
                 type: array
             required:
+            - frontend_id
             - load_balancer_id
             - phase
             type: object

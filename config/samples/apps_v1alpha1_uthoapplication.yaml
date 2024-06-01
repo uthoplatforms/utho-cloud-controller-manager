@@ -10,8 +10,13 @@ metadata:
   name: test-app
 spec:
   loadBalancer:
+    frontend:
+      name: test-fe
+      algorithm: roundrobin
+      protocol: http
+      port: 80
     type: application
-    dcslug: inmumbai
+    dcslug: innoida
     name: test-lb
   targetGroups:
     - health_check_timeout: 5

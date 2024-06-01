@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -95,7 +96,7 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	if app.Status.Phase == "" || app.Status.Phase == appsv1alpha1.LBPendingPhase || app.Status.Phase == appsv1alpha1.LBAttachmentErrorPhase {
+	if app.Status.Phase == "" || app.Status.Phase == appsv1alpha1.LBPendingPhase || app.Status.Phase == appsv1alpha1.LBErrorPhase {
 		err := r.createExternalResources(ctx, app, &l)
 		if err != nil {
 			return ctrl.Result{}, err
@@ -107,10 +108,11 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		// Check Lower Resources
 	}
 	// Create from Scratch
-	err := r.createExternalResources(ctx, app, &l)
-	if err != nil {
-		return ctrl.Result{RequeueAfter: errorRequeueDuration}, err
-	}
+	//err := r.createExternalResources(ctx, app, &l)
+	//if err != nil {
+	//	return ctrl.Result{RequeueAfter: errorRequeueDuration}, err
+	//}
+	l.Info("Finished Reconcile/Implement Logic")
 	return ctrl.Result{}, nil
 }
 
@@ -125,20 +127,23 @@ func (r *UthoApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *UthoApplicationReconciler) createExternalResources(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	l.Info("Creating External Resources")
+
 	app.Status.Phase = appsv1alpha1.LBPendingPhase
 	if err := r.Status().Update(ctx, app); err != nil {
 		return err
 	}
+
 	l.Info("Creating Load Balancer")
 	err := r.CreateUthoLoadBalancer(ctx, app, l)
 	if err != nil {
 		l.Error(err, "Unable to Create LB")
-		app.Status.Phase = appsv1alpha1.LBAttachmentErrorPhase
+		app.Status.Phase = appsv1alpha1.LBErrorPhase
 		if err := r.Status().Update(ctx, app); err != nil {
 			return err
 		}
 		return err
 	}
+
 	app.Status.Phase = appsv1alpha1.TGPendingPhase
 	if err := r.Status().Update(ctx, app); err != nil {
 		return err
@@ -147,15 +152,74 @@ func (r *UthoApplicationReconciler) createExternalResources(ctx context.Context,
 	l.Info("Creating Target Groups")
 	if err = r.CreateTargetGroups(ctx, app, l); err != nil {
 		l.Error(err, "Unable to Create Target Groups")
-		app.Status.Phase = appsv1alpha1.TGAttachmentErrorPhase
+		app.Status.Phase = appsv1alpha1.TGErrorPhase
 		if err := r.Status().Update(ctx, app); err != nil {
 			return err
 		}
 		return err
 	}
+
+	app.Status.Phase = appsv1alpha1.LBAttachmentPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return err
+	}
+
+	kubernetesID := os.Getenv("KUBERNETES_ID")
+	if err = r.AttachLBToCluster(ctx, kubernetesID, app, l); err != nil {
+		l.Error(err, "Unable to Attach LB to Cluster")
+		app.Status.Phase = appsv1alpha1.LBAttachmentErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return err
+		}
+		return errors.Wrap(err, "Unable to Attach LB to Cluster")
+	}
+
+	app.Status.Phase = appsv1alpha1.TGAttachmentPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return err
+	}
+
+	if err = r.AttachTargetGroupsToCluster(ctx, kubernetesID, app, l); err != nil {
+		l.Error(err, "Unable to Attach Target Groups to Cluster")
+		app.Status.Phase = appsv1alpha1.TGAttachmentErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return err
+		}
+		return errors.Wrap(err, "Unable to Attach Target Groups to Cluster")
+	}
+
+	app.Status.Phase = appsv1alpha1.FrontendPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return err
+	}
+
+	if err = r.CreateLBFrontend(ctx, app, l); err != nil {
+		l.Error(err, "Unable to Create Frontend")
+		app.Status.Phase = appsv1alpha1.FrontendErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return err
+		}
+		return errors.Wrap(err, "Unable to Create Frontend")
+	}
 	return nil
 }
 func (r *UthoApplicationReconciler) deleteExternalResources(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	l.Info("Deleting External Resources")
+
+	if err := r.DeleteLB(ctx, app, l); err != nil {
+		l.Error(err, "Unable to Delete LB")
+		app.Status.Phase = appsv1alpha1.LBDeletionErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return errors.Wrap(err, "Unable to add LB Deletion Error Phase")
+		}
+	}
+
+	if err := r.DeleteTargetGroups(ctx, app, l); err != nil {
+		l.Error(err, "Unable to Delete Target Groups")
+		app.Status.Phase = appsv1alpha1.TGDeletionErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return errors.Wrap(err, "Unable to Add TG Deletion Error Phase")
+		}
+	}
 	return nil
 }

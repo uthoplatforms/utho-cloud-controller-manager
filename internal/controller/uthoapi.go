@@ -25,20 +25,13 @@ func getAuthenticatedClient() (*utho.Client, error) {
 
 const CertifcateIDNotFound string = "Certificate ID Not Found"
 
-// func getLB(id string) (bool, error) {
-// 	uthoClient, err := getAuthenticatedClient()
-// 	if err != nil {
-// 		return false, err
-// 	}
-// 	lb, err := (*uthoClient).Loadbalancers().Read(id)
-// 	if err != nil {
-// 		return false, err
-// 	}
-// 	if lb.ID != id {
-// 		return false, nil
-// 	}
-// 	return true, nil
-// }
+func getLB(id string) (*utho.Loadbalancer, error) {
+	lb, err := (*uthoClient).Loadbalancers().Read(id)
+	if err != nil {
+		return nil, err
+	}
+	return lb, nil
+}
 
 func (r *UthoApplicationReconciler) CreateUthoLoadBalancer(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	lbreq := utho.CreateLoadbalancerParams{
@@ -54,6 +47,7 @@ func (r *UthoApplicationReconciler) CreateUthoLoadBalancer(ctx context.Context, 
 	app.Status.LoadBalancerID = newLB.ID
 	app.Status.Phase = appsv1alpha1.LBCreatedPhase
 
+	fmt.Printf("%+v\n", newLB)
 	l.Info("Updating LB Details in the Status")
 	if err = r.Status().Update(ctx, app); err != nil {
 		return errors.Wrap(err, "Error updating LB status")
@@ -171,42 +165,56 @@ func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *a
 		return errors.New("no lb id found in the status field")
 	}
 
-	frontend := app.Spec.LoadBalancer.Frontend
-
-	params := &utho.CreateLoadbalancerFrontendParams{
-		LoadbalancerId: lbID,
-		Name:           frontend.Name,
-		Proto:          strings.ToLower(frontend.Protocol),
-		Port:           fmt.Sprintf("%d", frontend.Port),
-		Algorithm:      strings.ToLower(frontend.Algorithm),
-		Redirecthttps:  TrueOrFalse(frontend.RedirectHttps),
-		Cookie:         TrueOrFalse(frontend.Cookie),
-	}
-	certificateID, err := getCertificateID(frontend.CertificateName, l)
+	lb, err := getLB(lbID)
 	if err != nil {
-		if err.Error() == CertifcateIDNotFound {
-			l.Info("Certificate ID not found")
-		} else {
-			return errors.Wrap(err, "Error Getting Certificate ID")
+		return errors.Wrap(err, "Error Getting LB")
+	}
+
+	if len(lb.Frontends) == 0 {
+		frontend := app.Spec.LoadBalancer.Frontend
+
+		params := &utho.CreateLoadbalancerFrontendParams{
+			LoadbalancerId: lbID,
+			Name:           frontend.Name,
+			Proto:          strings.ToLower(frontend.Protocol),
+			Port:           fmt.Sprintf("%d", frontend.Port),
+			Algorithm:      strings.ToLower(frontend.Algorithm),
+			Redirecthttps:  TrueOrFalse(frontend.RedirectHttps),
+			Cookie:         TrueOrFalse(frontend.Cookie),
 		}
-	}
+		certificateID, err := getCertificateID(frontend.CertificateName, l)
+		if err != nil {
+			if err.Error() == CertifcateIDNotFound {
+				l.Info("Certificate ID not found")
+			} else {
+				return errors.Wrap(err, "Error Getting Certificate ID")
+			}
+		}
 
-	if certificateID != "" {
-		params.CertificateID = certificateID
-	}
+		if certificateID != "" {
+			params.CertificateID = certificateID
+		}
 
-	fmt.Printf("%+v", params)
-	l.Info("Creating Frontend for LB")
-	res, err := (*uthoClient).Loadbalancers().CreateFrontend(*params)
-	if err != nil {
-		return errors.Wrap(err, "Error Creating Frontend")
-	}
-	app.Status.FrontendID = res.ID
-	app.Status.Phase = appsv1alpha1.FrontendCreatedPhase
+		l.Info("Creating Frontend for LB")
+		res, err := (*uthoClient).Loadbalancers().CreateFrontend(*params)
+		if err != nil {
+			return errors.Wrap(err, "Error Creating Frontend")
+		}
+		app.Status.FrontendID = res.ID
+		app.Status.Phase = appsv1alpha1.FrontendCreatedPhase
 
-	err = r.Status().Update(ctx, app)
-	if err != nil {
-		return errors.Wrap(err, "Error Updating Frontend in Status")
+		err = r.Status().Update(ctx, app)
+		if err != nil {
+			return errors.Wrap(err, "Error Updating Frontend in Status")
+		}
+	} else {
+		app.Status.FrontendID = lb.Frontends[0].ID
+		app.Status.Phase = appsv1alpha1.FrontendCreatedPhase
+
+		err = r.Status().Update(ctx, app)
+		if err != nil {
+			return errors.Wrap(err, "Error Updating Frontend in Status")
+		}
 	}
 	return nil
 }

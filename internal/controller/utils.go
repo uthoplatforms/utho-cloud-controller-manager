@@ -1,7 +1,10 @@
 package controller
 
 import (
+	"context"
 	"flag"
+	"github.com/go-logr/logr"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"path/filepath"
 
 	"github.com/pkg/errors"
@@ -13,16 +16,9 @@ import (
 
 func GetClientSet() (*kubernetes.Clientset, error) {
 	home := homedir.HomeDir()
-	kubeconfig := flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "Location to the Kubeconfig file")
+	kube := flag.String("kube", filepath.Join(home, ".kube", "config"), "Location to the Kubeconfig file")
 
-	/* Check whether code is running internally or externally and authenticate accordingly
-	if kubeconfig exists {
-		build config from kubeconfig
-	} else {
-		Build Config from SA credentials
-	}
-	*/
-	config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+	config, err := clientcmd.BuildConfigFromFlags("", *kube)
 	if err != nil {
 		config, err = rest.InClusterConfig()
 		if err != nil {
@@ -64,4 +60,23 @@ func TrueOrFalse(b bool) string {
 		return "1"
 	}
 	return "0"
+}
+
+func getClusterID(ctx context.Context, l *logr.Logger) (string, error) {
+	clientset, err := GetClientSet()
+	if err != nil {
+		return "", errors.Wrap(err, "Error getting clientset")
+	}
+
+	l.Info("Fetching Cluster ID Label")
+	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return "", errors.Wrap(err, "Error getting Kubernetes nodes")
+	}
+	clusterID := nodes.Items[0].Labels["cluster_id"]
+	if clusterID == "" {
+		return "", errors.Wrap(err, "No Cluster ID found")
+	}
+
+	return clusterID, nil
 }

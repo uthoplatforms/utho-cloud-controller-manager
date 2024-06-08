@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"github.com/pkg/errors"
@@ -78,7 +77,7 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		l.Info("Application Marked for Deletion")
 		if containsString(app.ObjectMeta.Finalizers, finalizerID) {
 			if err := r.deleteExternalResources(ctx, app, &l); err != nil {
-				return ctrl.Result{}, nil
+				return ctrl.Result{}, err
 			}
 			app.ObjectMeta.Finalizers = removeString(app.ObjectMeta.Finalizers, finalizerID)
 			if err := r.Update(ctx, app); err != nil {
@@ -96,22 +95,44 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
-	if app.Status.Phase == "" || app.Status.Phase == appsv1alpha1.LBPendingPhase || app.Status.Phase == appsv1alpha1.LBErrorPhase {
+	phase := app.Status.Phase
+	if phase == "" || phase == appsv1alpha1.LBPendingPhase || phase == appsv1alpha1.LBErrorPhase {
+		l.Info("Creating a new app from scratch")
 		err := r.createExternalResources(ctx, app, &l)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		return ctrl.Result{}, nil
-	} else if app.Status.Phase == appsv1alpha1.RunningPhase {
+
+	} else if phase == appsv1alpha1.LBCreatedPhase || phase == appsv1alpha1.TGPendingPhase || phase == appsv1alpha1.TGErrorPhase {
+		// TG Onwards
+		// Check the len of tg ids in the statuses anf create one that is required
+		l.Info("Creating from TG onwards")
+	} else if phase == appsv1alpha1.TGCreatedPhase || phase == appsv1alpha1.LBAttachmentPendingPhase || phase == appsv1alpha1.LBAttachmentErrorPhase {
+		// LB Attachment Onwards
+		l.Info("From LB Attachment to the Cluster Onwards")
+	} else if phase == appsv1alpha1.LBAttachmentCreatedPhase || phase == appsv1alpha1.TGAttachmentPendingPhase || phase == appsv1alpha1.TGAttachmentErrorPhase {
+		// TG Attachment Onwards
+		l.Info("From TG Attachment to the cluster onwards")
+	} else if phase == appsv1alpha1.TGAttachmentCreatedPhase || phase == appsv1alpha1.FrontendPendingPhase || phase == appsv1alpha1.FrontendErrorPhase {
+		// Create Frontend Onwards
+		l.Info("In the Frontend Creation Phase")
+		if err := r.CreateLBFrontend(ctx, app, &l); err != nil {
+			app.Status.Phase = appsv1alpha1.FrontendErrorPhase
+			if err := r.Status().Update(ctx, app); err != nil {
+				return ctrl.Result{}, err
+			}
+			return ctrl.Result{}, err
+		}
+		app.Status.Phase = appsv1alpha1.RunningPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "Unable to add Running Phase")
+		}
+	} else if phase == appsv1alpha1.RunningPhase || phase == appsv1alpha1.FrontendCreatedPhase {
 		// Update Logic
-	} else if app.Status.LoadBalancerID == "" {
-		// Check Lower Resources
+		//Update Frontend
+		//.Update Target Groups
 	}
-	// Create from Scratch
-	//err := r.createExternalResources(ctx, app, &l)
-	//if err != nil {
-	//	return ctrl.Result{RequeueAfter: errorRequeueDuration}, err
-	//}
+
 	l.Info("Finished Reconcile/Implement Logic")
 	return ctrl.Result{}, nil
 }
@@ -164,7 +185,7 @@ func (r *UthoApplicationReconciler) createExternalResources(ctx context.Context,
 		return err
 	}
 
-	kubernetesID := os.Getenv("KUBERNETES_ID")
+	kubernetesID, err := getClusterID(ctx, l)
 	if err = r.AttachLBToCluster(ctx, kubernetesID, app, l); err != nil {
 		l.Error(err, "Unable to Attach LB to Cluster")
 		app.Status.Phase = appsv1alpha1.LBAttachmentErrorPhase
@@ -200,6 +221,11 @@ func (r *UthoApplicationReconciler) createExternalResources(ctx context.Context,
 			return err
 		}
 		return errors.Wrap(err, "Unable to Create Frontend")
+	}
+
+	app.Status.Phase = appsv1alpha1.RunningPhase
+	if err = r.Status().Update(ctx, app); err != nil {
+		return errors.Wrap(err, "Unable to add Running Phase")
 	}
 	return nil
 }

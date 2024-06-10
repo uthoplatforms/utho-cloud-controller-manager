@@ -11,7 +11,7 @@ metadata:
 spec:
   loadBalancer:
     frontend:
-      name: test-fe
+      name: test-fe-3
       algorithm: roundrobin
       protocol: http
       port: 80

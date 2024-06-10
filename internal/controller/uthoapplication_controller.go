@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/pkg/errors"
@@ -59,6 +60,12 @@ type UthoApplicationReconciler struct {
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
+func init() {
+	uthoClient, err = getAuthenticatedClient()
+	if err != nil {
+		panic(fmt.Errorf("No API Key Present to get authenticated client: %v", err))
+	}
+}
 func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	l := log.FromContext(ctx)
 	l.Info("Receieved Reconcile Request", req.Name, req.Namespace)
@@ -107,12 +114,26 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		// TG Onwards
 		// Check the len of tg ids in the statuses anf create one that is required
 		l.Info("Creating from TG onwards")
+		if err := r.TGCreationOnwards(ctx, app, &l); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
 	} else if phase == appsv1alpha1.TGCreatedPhase || phase == appsv1alpha1.LBAttachmentPendingPhase || phase == appsv1alpha1.LBAttachmentErrorPhase {
 		// LB Attachment Onwards
 		l.Info("From LB Attachment to the Cluster Onwards")
+		if err := r.LBAttachmentOnwards(ctx, app, &l); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+
 	} else if phase == appsv1alpha1.LBAttachmentCreatedPhase || phase == appsv1alpha1.TGAttachmentPendingPhase || phase == appsv1alpha1.TGAttachmentErrorPhase {
 		// TG Attachment Onwards
 		l.Info("From TG Attachment to the cluster onwards")
+		if err := r.TGAttachmentOnwards(ctx, app, &l); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+
 	} else if phase == appsv1alpha1.TGAttachmentCreatedPhase || phase == appsv1alpha1.FrontendPendingPhase || phase == appsv1alpha1.FrontendErrorPhase {
 		// Create Frontend Onwards
 		l.Info("In the Frontend Creation Phase")
@@ -127,10 +148,25 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if err := r.Status().Update(ctx, app); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "Unable to add Running Phase")
 		}
+
 	} else if phase == appsv1alpha1.RunningPhase || phase == appsv1alpha1.FrontendCreatedPhase {
 		// Update Logic
+
+		l.Info("Running Phase!")
 		//Update Frontend
+		if err := r.UpdateFrontend(app, &l); err != nil {
+			if err.Error() == FrontendIDNotFound {
+				l.Info("No Frontend ID Found")
+				return ctrl.Result{}, nil
+			}
+			l.Error(err, "Error Updating Frontend")
+			return ctrl.Result{}, err
+		}
 		//.Update Target Groups
+		if err := r.UpdateTargetGroups(app, &l); err != nil {
+			l.Error(err, "Error Updating TargetGroups")
+			return ctrl.Result{}, err
+		}
 	}
 
 	l.Info("Finished Reconcile/Implement Logic")
@@ -165,68 +201,37 @@ func (r *UthoApplicationReconciler) createExternalResources(ctx context.Context,
 		return err
 	}
 
-	app.Status.Phase = appsv1alpha1.TGPendingPhase
-	if err := r.Status().Update(ctx, app); err != nil {
+	if err = r.TGCreationOnwards(ctx, app, l); err != nil {
 		return err
 	}
 
-	l.Info("Creating Target Groups")
-	if err = r.CreateTargetGroups(ctx, app, l); err != nil {
-		l.Error(err, "Unable to Create Target Groups")
-		app.Status.Phase = appsv1alpha1.TGErrorPhase
-		if err := r.Status().Update(ctx, app); err != nil {
-			return err
-		}
-		return err
-	}
-
-	app.Status.Phase = appsv1alpha1.LBAttachmentPendingPhase
-	if err := r.Status().Update(ctx, app); err != nil {
-		return err
-	}
-
-	kubernetesID, err := getClusterID(ctx, l)
-	if err = r.AttachLBToCluster(ctx, kubernetesID, app, l); err != nil {
-		l.Error(err, "Unable to Attach LB to Cluster")
-		app.Status.Phase = appsv1alpha1.LBAttachmentErrorPhase
-		if err := r.Status().Update(ctx, app); err != nil {
-			return err
-		}
-		return errors.Wrap(err, "Unable to Attach LB to Cluster")
-	}
-
-	app.Status.Phase = appsv1alpha1.TGAttachmentPendingPhase
-	if err := r.Status().Update(ctx, app); err != nil {
-		return err
-	}
-
-	if err = r.AttachTargetGroupsToCluster(ctx, kubernetesID, app, l); err != nil {
-		l.Error(err, "Unable to Attach Target Groups to Cluster")
-		app.Status.Phase = appsv1alpha1.TGAttachmentErrorPhase
-		if err := r.Status().Update(ctx, app); err != nil {
-			return err
-		}
-		return errors.Wrap(err, "Unable to Attach Target Groups to Cluster")
-	}
-
-	app.Status.Phase = appsv1alpha1.FrontendPendingPhase
-	if err := r.Status().Update(ctx, app); err != nil {
-		return err
-	}
-
-	if err = r.CreateLBFrontend(ctx, app, l); err != nil {
-		l.Error(err, "Unable to Create Frontend")
-		app.Status.Phase = appsv1alpha1.FrontendErrorPhase
-		if err := r.Status().Update(ctx, app); err != nil {
-			return err
-		}
-		return errors.Wrap(err, "Unable to Create Frontend")
-	}
-
-	app.Status.Phase = appsv1alpha1.RunningPhase
-	if err = r.Status().Update(ctx, app); err != nil {
-		return errors.Wrap(err, "Unable to add Running Phase")
-	}
+	//if err = r.AttachTargetGroupsToCluster(ctx, kubernetesID, app, l); err != nil {
+	//	l.Error(err, "Unable to Attach Target Groups to Cluster")
+	//	app.Status.Phase = appsv1alpha1.TGAttachmentErrorPhase
+	//	if err := r.Status().Update(ctx, app); err != nil {
+	//		return err
+	//	}
+	//	return errors.Wrap(err, "Unable to Attach Target Groups to Cluster")
+	//}
+	//
+	//app.Status.Phase = appsv1alpha1.FrontendPendingPhase
+	//if err := r.Status().Update(ctx, app); err != nil {
+	//	return err
+	//}
+	//
+	//if err = r.CreateLBFrontend(ctx, app, l); err != nil {
+	//	l.Error(err, "Unable to Create Frontend")
+	//	app.Status.Phase = appsv1alpha1.FrontendErrorPhase
+	//	if err := r.Status().Update(ctx, app); err != nil {
+	//		return err
+	//	}
+	//	return errors.Wrap(err, "Unable to Create Frontend")
+	//}
+	//
+	//app.Status.Phase = appsv1alpha1.RunningPhase
+	//if err = r.Status().Update(ctx, app); err != nil {
+	//	return errors.Wrap(err, "Unable to add Running Phase")
+	//}
 	return nil
 }
 func (r *UthoApplicationReconciler) deleteExternalResources(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {

@@ -12,7 +12,10 @@ import (
 	"github.com/uthoplatforms/utho-go/utho"
 )
 
-var uthoClient, _ = getAuthenticatedClient()
+var (
+	uthoClient *utho.Client
+	err        error
+)
 
 func getAuthenticatedClient() (*utho.Client, error) {
 	apiKey := os.Getenv("API_KEY")
@@ -21,16 +24,6 @@ func getAuthenticatedClient() (*utho.Client, error) {
 		return nil, err
 	}
 	return &client, nil
-}
-
-const CertifcateIDNotFound string = "Certificate ID Not Found"
-
-func getLB(id string) (*utho.Loadbalancer, error) {
-	lb, err := (*uthoClient).Loadbalancers().Read(id)
-	if err != nil {
-		return nil, err
-	}
-	return lb, nil
 }
 
 func (r *UthoApplicationReconciler) CreateUthoLoadBalancer(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
@@ -61,7 +54,11 @@ func (r *UthoApplicationReconciler) CreateTargetGroups(ctx context.Context, app 
 	for _, tg := range app.Spec.TargetGroups {
 		err := r.CreateTargetGroup(ctx, &tg, app, l)
 		if err != nil {
-			return err
+			if err.Error() == TGAlreadyExists {
+				l.Info(TGAlreadyExists)
+				continue
+			}
+			return errors.Wrap(err, "Unable to Create Target Group")
 		}
 	}
 	app.Status.Phase = appsv1alpha1.TGCreatedPhase
@@ -76,9 +73,9 @@ func (r *UthoApplicationReconciler) CreateTargetGroup(ctx context.Context, tg *a
 
 	tgreq := utho.CreateTargetGroupParams{
 		Name:                tg.Name,
-		Protocol:            tg.Protocol,
+		Protocol:            strings.ToUpper(tg.Protocol),
 		HealthCheckPath:     tg.HealthCheckPath,
-		HealthCheckProtocol: tg.HealthCheckProtocol,
+		HealthCheckProtocol: strings.ToUpper(tg.HealthCheckProtocol),
 		Port:                fmt.Sprintf("%d", tg.Port),
 		HealthCheckTimeout:  fmt.Sprintf("%d", tg.HealthCheckTimeout),
 		HealthCheckInterval: fmt.Sprintf("%v", tg.HealthCheckInterval),
@@ -86,11 +83,9 @@ func (r *UthoApplicationReconciler) CreateTargetGroup(ctx context.Context, tg *a
 		UnhealthyThreshold:  fmt.Sprintf("%v", tg.UnhealthyThreshold),
 	}
 
-	fmt.Printf("%+v", tgreq)
-
 	newTG, err := (*uthoClient).TargetGroup().Create(tgreq)
 	if err != nil {
-		l.Error(err, "Unable to create TG")
+		//l.Error(err, "Unable to create TG")
 		return err
 	}
 	l.Info("Adding TG ID to the Status Field")
@@ -116,6 +111,10 @@ func (r *UthoApplicationReconciler) AttachLBToCluster(ctx context.Context, kuber
 	}
 	_, err := (*uthoClient).Kubernetes().CreateLoadbalancer(params)
 	if err != nil {
+		if err.Error() == LBAlreadyAttached {
+			l.Info("LB Already attached to cluster")
+			return nil
+		}
 		return errors.Wrap(err, "Error Attaching LB to the Cluster")
 	}
 
@@ -132,6 +131,9 @@ func (r *UthoApplicationReconciler) AttachTargetGroupsToCluster(ctx context.Cont
 	l.Info("Attaching Target Groups to the Cluster")
 	for _, tg := range app.Status.TargetGroupsID {
 		if err := r.AttachTargetGroupToCluster(tg, kubernetesID, l); err != nil {
+			if err.Error() == TGAlreadyAttached {
+				continue
+			}
 			return errors.Wrapf(err, "Unable to Attach TG: %s to the Cluster", tg)
 		}
 	}
@@ -162,7 +164,7 @@ func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *a
 
 	lbID := app.Status.LoadBalancerID
 	if lbID == "" {
-		return errors.New("no lb id found in the status field")
+		return errors.New(LBIDNotFound)
 	}
 
 	lb, err := getLB(lbID)
@@ -184,7 +186,7 @@ func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *a
 		}
 		certificateID, err := getCertificateID(frontend.CertificateName, l)
 		if err != nil {
-			if err.Error() == CertifcateIDNotFound {
+			if err.Error() == CertificateIDNotFound {
 				l.Info("Certificate ID not found")
 			} else {
 				return errors.Wrap(err, "Error Getting Certificate ID")
@@ -200,6 +202,7 @@ func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *a
 		if err != nil {
 			return errors.Wrap(err, "Error Creating Frontend")
 		}
+
 		app.Status.FrontendID = res.ID
 		app.Status.Phase = appsv1alpha1.FrontendCreatedPhase
 
@@ -233,70 +236,92 @@ func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *a
 // 	}
 
 // }
+func (r *UthoApplicationReconciler) TGCreationOnwards(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 
-func getCertificateID(certName string, l *logr.Logger) (string, error) {
-	l.Info("Getting Certificate ID")
-
-	var certID string
-	certs, err := (*uthoClient).Ssl().List()
-	if err != nil {
-		return "", errors.Wrap(err, "Error Getting Certificate ID")
+	app.Status.Phase = appsv1alpha1.TGPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return err
 	}
 
-	for _, cert := range certs {
-		if cert.Name == certName {
-			certID = cert.ID
-		}
-	}
-	if certID != "" {
-		return certID, nil
-	}
-	return "", errors.New(CertifcateIDNotFound)
-}
-
-func (r *UthoApplicationReconciler) DeleteLB(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
-	lbID := app.Status.LoadBalancerID
-
-	if lbID == "" {
-		return errors.New("no lb id found in the status field")
-	}
-
-	l.Info("Deleting LB")
-	_, err := (*uthoClient).Loadbalancers().Delete(lbID)
-	if err != nil {
-		return errors.Wrap(err, "Error Deleting LB")
-	}
-
-	l.Info("Updating Status Field")
-	app.Status.Phase = appsv1alpha1.LBDeletedPhase
-	if err = r.Status().Update(ctx, app); err != nil {
-		return errors.Wrap(err, "Error Updating LB Status.")
-	}
-	return nil
-}
-
-func (r *UthoApplicationReconciler) DeleteTargetGroups(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
-
-	l.Info("Deleting Target Groups")
-	tgs := app.Status.TargetGroupsID
-
-	for i, tg := range tgs {
-		if err := DeleteTargetGroup(tg, app.Spec.TargetGroups[i].Name); err != nil {
+	l.Info("Creating Target Groups")
+	if err := r.CreateTargetGroups(ctx, app, l); err != nil {
+		l.Error(err, "Unable to Create Target Groups")
+		app.Status.Phase = appsv1alpha1.TGErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
 			return err
 		}
+		return err
 	}
 
-	app.Status.Phase = appsv1alpha1.TGDeletedPhase
-	if err := r.Status().Update(ctx, app); err != nil {
-		return errors.Wrap(err, "Error Updating Target Groups Deletion Status.")
+	if err := r.LBAttachmentOnwards(ctx, app, l); err != nil {
+		return err
 	}
 	return nil
 }
+func (r *UthoApplicationReconciler) LBAttachmentOnwards(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+	app.Status.Phase = appsv1alpha1.LBAttachmentPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return err
+	}
 
-func DeleteTargetGroup(id, name string) error {
-	_, err := (*uthoClient).TargetGroup().Delete(id, name)
+	kubernetesID, err := getClusterID(ctx, l)
 	if err != nil {
-		return errors.Wrapf(err, "Error Deleting Target Group with ID: %s znd Name: %s", id, name)
+		return errors.Wrap(err, "Unable to Get Cluster ID")
+	}
+
+	if err = r.AttachLBToCluster(ctx, kubernetesID, app, l); err != nil {
+		l.Error(err, "Unable to Attach LB to Cluster")
+		app.Status.Phase = appsv1alpha1.LBAttachmentErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return err
+		}
+		return errors.Wrap(err, "Unable to Attach LB to Cluster")
+	}
+
+	if err = r.TGAttachmentOnwards(ctx, app, l); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *UthoApplicationReconciler) TGAttachmentOnwards(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+	app.Status.Phase = appsv1alpha1.TGAttachmentPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return err
+	}
+
+	kubernetesID, err := getClusterID(ctx, l)
+	if err != nil {
+		return errors.Wrap(err, "Unable to Get Cluster ID")
+	}
+
+	if err = r.AttachTargetGroupsToCluster(ctx, kubernetesID, app, l); err != nil {
+		l.Error(err, "Unable to Attach Target Groups to Cluster")
+		app.Status.Phase = appsv1alpha1.TGAttachmentErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return err
+		}
+		return errors.Wrap(err, "Unable to Attach Target Groups to Cluster")
+	}
+	app.Status.Phase = appsv1alpha1.FrontendPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return err
+	}
+
+	if err = r.CreateLBFrontend(ctx, app, l); err != nil {
+		l.Error(err, "Unable to Create Frontend")
+		app.Status.Phase = appsv1alpha1.FrontendErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return err
+		}
+		return errors.Wrap(err, "Unable to Create Frontend")
+	}
+	l.Info("Frontend Created")
+
+	app.Status.Phase = appsv1alpha1.RunningPhase
+	if err = r.Status().Update(ctx, app); err != nil {
+		return errors.Wrap(err, "Unable to add Running Phase")
 	}
 	return nil
 }

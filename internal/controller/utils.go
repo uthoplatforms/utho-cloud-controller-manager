@@ -4,10 +4,9 @@ import (
 	"context"
 	"flag"
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"path/filepath"
-
 	"github.com/pkg/errors"
+	"github.com/uthoplatforms/utho-go/utho"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -16,9 +15,9 @@ import (
 
 func GetClientSet() (*kubernetes.Clientset, error) {
 	home := homedir.HomeDir()
-	kube := flag.String("kube", filepath.Join(home, ".kube", "config"), "Location to the Kubeconfig file")
+	kube := (home + "/.kube/config")
 
-	config, err := clientcmd.BuildConfigFromFlags("", *kube)
+	config, err := clientcmd.BuildConfigFromFlags("", kube)
 	if err != nil {
 		config, err = rest.InClusterConfig()
 		if err != nil {
@@ -79,4 +78,35 @@ func getClusterID(ctx context.Context, l *logr.Logger) (string, error) {
 	}
 
 	return clusterID, nil
+}
+
+func getLB(id string) (*utho.Loadbalancer, error) {
+	lb, err := (*uthoClient).Loadbalancers().Read(id)
+	if err != nil {
+		return nil, err
+	}
+	return lb, nil
+}
+
+func getCertificateID(certName string, l *logr.Logger) (string, error) {
+	l.Info("Getting Certificate ID")
+
+	if certName == "" {
+		return "", errors.New(CertificateIDNotFound)
+	}
+	var certID string
+	certs, err := (*uthoClient).Ssl().List()
+	if err != nil {
+		return "", errors.Wrap(err, "Error Getting Certificate ID")
+	}
+
+	for _, cert := range certs {
+		if cert.Name == certName {
+			certID = cert.ID
+		}
+	}
+	if certID != "" {
+		return certID, nil
+	}
+	return "", errors.New(CertificateIDNotFound)
 }

@@ -137,10 +137,18 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	} else if phase == appsv1alpha1.TGAttachmentCreatedPhase || phase == appsv1alpha1.FrontendPendingPhase || phase == appsv1alpha1.FrontendErrorPhase {
 		// Create Frontend Onwards
 		l.Info("In the Frontend Creation Phase")
-		if err := r.CreateLBFrontend(ctx, app, &l); err != nil {
-			app.Status.Phase = appsv1alpha1.FrontendErrorPhase
+		if err := r.FrontendCreationOnwards(ctx, app, &l); err != nil {
+			return ctrl.Result{}, err
+		}
+		return ctrl.Result{}, nil
+	} else if phase == appsv1alpha1.FrontendCreatedPhase || phase == appsv1alpha1.ACLPendingPhase || phase == appsv1alpha1.ACLErrorPhase {
+
+		l.Info("Into ACl Creation Phase")
+		if err := r.CreateACLRules(ctx, app, &l); err != nil {
+			l.Error(err, "Unable to create ACL Rules")
+			app.Status.Phase = appsv1alpha1.ACLErrorPhase
 			if err := r.Status().Update(ctx, app); err != nil {
-				return ctrl.Result{}, err
+				return ctrl.Result{}, errors.Wrap(err, "Unable to add ACL Error Phase")
 			}
 			return ctrl.Result{}, err
 		}
@@ -148,13 +156,19 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		if err := r.Status().Update(ctx, app); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "Unable to add Running Phase")
 		}
-
-	} else if phase == appsv1alpha1.RunningPhase || phase == appsv1alpha1.FrontendCreatedPhase {
+		return ctrl.Result{}, nil
+	} else if phase == appsv1alpha1.RunningPhase || phase == appsv1alpha1.ACLCreatedPhase {
 		// Update Logic
 
 		l.Info("Running Phase!")
+		if phase == appsv1alpha1.RunningPhase {
+			app.Status.Phase = appsv1alpha1.RunningPhase
+			if err := r.Status().Update(ctx, app); err != nil {
+				return ctrl.Result{}, errors.Wrap(err, "Unable to add Running Phase")
+			}
+		}
 		//Update Frontend
-		if err := r.UpdateFrontend(app, &l); err != nil {
+		if err := r.UpdateFrontend(ctx, app, &l); err != nil {
 			if err.Error() == FrontendIDNotFound {
 				l.Info("No Frontend ID Found")
 				return ctrl.Result{}, nil
@@ -163,13 +177,13 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, err
 		}
 		//.Update Target Groups
-		if err := r.UpdateTargetGroups(app, &l); err != nil {
+		if err := r.UpdateTargetGroups(ctx, app, &l); err != nil {
 			l.Error(err, "Error Updating TargetGroups")
 			return ctrl.Result{}, err
 		}
 	}
 
-	l.Info("Finished Reconcile/Implement Logic")
+	l.Info("Successfully Finished Reconciliation")
 	return ctrl.Result{}, nil
 }
 

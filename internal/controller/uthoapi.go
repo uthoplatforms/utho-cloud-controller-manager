@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/util/json"
 	"os"
 	"strings"
 
@@ -222,6 +223,65 @@ func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *a
 	return nil
 }
 
+func (r *UthoApplicationReconciler) CreateACLRules(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+
+	l.Info("Creating ACL Rules")
+	rules := app.Spec.LoadBalancer.ACL
+	for _, rule := range rules {
+		if err := r.CreateACLRule(ctx, app, rule, l); err != nil {
+			if err.Error() == ACLAlreadyExists {
+				l.Info("ACL Rule already exists")
+				continue
+			}
+			return err
+		}
+	}
+
+	app.Status.Phase = appsv1alpha1.ACLCreatedPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return errors.Wrap(err, "Error Updating ACL Created Phase")
+	}
+
+	l.Info("ACL Rules Created")
+	return nil
+}
+
+func (r *UthoApplicationReconciler) CreateACLRule(ctx context.Context, app *appsv1alpha1.UthoApplication, rule appsv1alpha1.ACLRule, l *logr.Logger) error {
+	frontendID := app.Status.FrontendID
+	if frontendID == "" {
+		return errors.New(FrontendIDNotFound)
+	}
+
+	lbID := app.Status.LoadBalancerID
+	if lbID == "" {
+		return errors.New(LBIDNotFound)
+	}
+
+	l.Info("Creating ACL Rule")
+	rule.Value.FrontendID = frontendID
+	byteValue, err := json.Marshal(rule.Value)
+	if err != nil {
+		return errors.Wrap(err, "Error Marshalling ACL Rule")
+	}
+	params := utho.CreateLoadbalancerACLParams{
+		LoadbalancerId: lbID,
+		Name:           rule.Name,
+		ConditionType:  rule.ConditionType,
+		FrontendID:     frontendID,
+		Value:          string(byteValue),
+	}
+	res, err := (*uthoClient).Loadbalancers().CreateACL(params)
+	if err != nil {
+		return err
+	}
+
+	app.Status.ACLRuleIDs = append(app.Status.ACLRuleIDs, res.ID)
+	if err = r.Status().Update(ctx, app); err != nil {
+		return errors.Wrap(err, "Error Updating ACL Rule ID in Status Field")
+	}
+	return nil
+}
+
 // func (r *UthoApplicationReconciler) FetchKubernetesID(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 
 // 	ip := os.Getenv("HOST_IP")
@@ -304,6 +364,15 @@ func (r *UthoApplicationReconciler) TGAttachmentOnwards(ctx context.Context, app
 		}
 		return errors.Wrap(err, "Unable to Attach Target Groups to Cluster")
 	}
+
+	if err = r.FrontendCreationOnwards(ctx, app, l); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *UthoApplicationReconciler) FrontendCreationOnwards(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	app.Status.Phase = appsv1alpha1.FrontendPendingPhase
 	if err := r.Status().Update(ctx, app); err != nil {
 		return err
@@ -318,6 +387,15 @@ func (r *UthoApplicationReconciler) TGAttachmentOnwards(ctx context.Context, app
 		return errors.Wrap(err, "Unable to Create Frontend")
 	}
 	l.Info("Frontend Created")
+
+	app.Status.Phase = appsv1alpha1.ACLPendingPhase
+	if err = r.Status().Update(ctx, app); err != nil {
+		return errors.Wrap(err, "Unable to Update ACL Pending Status")
+	}
+
+	if err = r.CreateACLRules(ctx, app, l); err != nil {
+		return err
+	}
 
 	app.Status.Phase = appsv1alpha1.RunningPhase
 	if err = r.Status().Update(ctx, app); err != nil {

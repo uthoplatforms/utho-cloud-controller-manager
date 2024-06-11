@@ -7,4 +7,6 @@ const (
 	FrontendIDNotFound    string = "no frontend id found in the status field"
 	LBIDNotFound          string = "no lb id found in the status field"
 	TGAlreadyExists       string = "Target Group with same name already in your account, Please provide different name."
+	ACLAlreadyExists      string = "Duplicate Entry"
+	ACLIDNotFound         string = "ACL ID Not Found"
 )

@@ -40,6 +40,33 @@ spec:
                 description: Foo is an example field of UthoApplication. Edit uthoapplication_types.go
                   to remove/update
                 properties:
+                  aclRule:
+                    items:
+                      properties:
+                        conditionType:
+                          type: string
+                        name:
+                          type: string
+                        value:
+                          properties:
+                            data:
+                              items:
+                                type: string
+                              type: array
+                            frontend_id:
+                              type: string
+                            type:
+                              type: string
+                          required:
+                          - data
+                          - type
+                          type: object
+                      required:
+                      - conditionType
+                      - name
+                      - value
+                      type: object
+                    type: array
                   dcslug:
                     type: string
                   frontend:
@@ -72,7 +99,6 @@ spec:
                     type: string
                 required:
                 - dcslug
-                - frontend
                 - name
                 type: object
               targetGroups:
@@ -120,6 +146,10 @@ spec:
           status:
             description: UthoApplicationStatus defines the observed state of UthoApplication
             properties:
+              acl_rule_ids:
+                items:
+                  type: string
+                type: array
               frontend_id:
                 type: string
               load_balancer_id:
@@ -129,7 +159,7 @@ spec:
                 type: string
               phase:
                 type: string
-              target_group_id:
+              target_group_ids:
                 items:
                   type: string
                 type: array

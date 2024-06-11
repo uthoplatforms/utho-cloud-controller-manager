@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
@@ -9,7 +10,7 @@ import (
 	"strings"
 )
 
-func (r *UthoApplicationReconciler) UpdateFrontend(app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+func (r *UthoApplicationReconciler) UpdateFrontend(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 
 	l.Info("Updating Frontend")
 	frontendID := app.Status.FrontendID
@@ -49,7 +50,7 @@ func (r *UthoApplicationReconciler) UpdateFrontend(app *appsv1alpha1.UthoApplica
 		params.CertificateID = "0"
 	}
 
-	l.Info("Parameter Log", "params:", params)
+	l.Info("Update Frontend Params", "params", params)
 	_, err = (*uthoClient).Loadbalancers().UpdateFrontend(*params, lbID, frontendID)
 	if err != nil {
 		return errors.Wrap(err, "Error Updating Frontend")
@@ -57,7 +58,7 @@ func (r *UthoApplicationReconciler) UpdateFrontend(app *appsv1alpha1.UthoApplica
 	return nil
 }
 
-func (r *UthoApplicationReconciler) UpdateTargetGroups(app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+func (r *UthoApplicationReconciler) UpdateTargetGroups(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	tgs := app.Spec.TargetGroups
 
 	tgIds := app.Status.TargetGroupsID
@@ -66,7 +67,9 @@ func (r *UthoApplicationReconciler) UpdateTargetGroups(app *appsv1alpha1.UthoApp
 	if len(tgIds) != len(tgs) {
 		return errors.New("Target groups Not Matching")
 	}
+
 	for i, tg := range tgs {
+		//l.Info("Target Groups", "TGID:", tgIds[i], "TG:", tg)
 		if err := updateTargetGroup(&tg, tgIds[i], l); err != nil {
 			return err
 		}
@@ -78,6 +81,7 @@ func updateTargetGroup(tg *appsv1alpha1.TargetGroup, id string, l *logr.Logger) 
 
 	params := &utho.UpdateTargetGroupParams{
 		Name:                tg.Name,
+		TargetGroupId:       id,
 		Protocol:            strings.ToUpper(tg.Protocol),
 		HealthCheckPath:     tg.HealthCheckPath,
 		HealthCheckProtocol: strings.ToUpper(tg.HealthCheckProtocol),
@@ -87,6 +91,7 @@ func updateTargetGroup(tg *appsv1alpha1.TargetGroup, id string, l *logr.Logger) 
 		HealthyThreshold:    fmt.Sprintf("%v", tg.HealthyThreshold),
 		UnhealthyThreshold:  fmt.Sprintf("%v", tg.UnhealthyThreshold),
 	}
+
 	l.Info("Updating Target Group")
 	_, err := (*uthoClient).TargetGroup().Update(*params)
 	if err != nil {
@@ -94,3 +99,48 @@ func updateTargetGroup(tg *appsv1alpha1.TargetGroup, id string, l *logr.Logger) 
 	}
 	return nil
 }
+
+//func (r *UthoApplicationReconciler) UpdateACLRules(app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+//
+//	l.Info("Updating ACL Rules")
+//
+//	acls := app.Spec.LoadBalancer.ACL
+//	aclIDs := app.Status.ACLRuleIDs
+//
+//	frontendID := app.Status.FrontendID
+//	lbID := app.Status.LoadBalancerID
+//
+//	if len(aclIDs) != len(acls) {
+//		return errors.New("ACL Rules Not Matching")
+//	}
+//	for i, aclID := range aclIDs {
+//		if err := UpdateACLRule(aclID, frontendID, lbID ,acls[i], l); err != nil {
+//
+//		}
+//	}
+//	return nil
+//}
+//
+//func UpdateACLRule(id, frontendID , lbID string, rule appsv1alpha1.ACLRule, l *logr.Logger) error {
+//
+//	if id == "" {
+//		return errors.New(ACLIDNotFound)
+//	}
+//
+//	l.Info("Updating ACL Rule")
+//	rule.Value.FrontendID = frontendID
+//	byteValue, err := json.Marshal(rule.Value)
+//	if err != nil {
+//		return errors.Wrap(err, "Error Marshalling ACL Rule")
+//	}
+//	params := utho.Updat{
+//		LoadbalancerId: lbID,
+//		Name:           rule.Name,
+//		ConditionType:  rule.ConditionType,
+//		FrontendID:     frontendID,
+//		Value:          string(byteValue),
+//	}
+//
+//	(*uthoClient).Loadbalancers().
+//	return nil
+//}

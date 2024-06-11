@@ -34,11 +34,12 @@ type UthoApplicationSpec struct {
 }
 
 type LoadBalancer struct {
-	Frontend Frontend `json:"frontend"`
+	Frontend Frontend `json:"frontend,omitempty"`
 	// +kubebuilder:default:=application
-	Type   string `json:"type,omitempty"`
-	Dcslug string `json:"dcslug"`
-	Name   string `json:"name"`
+	Type   string    `json:"type,omitempty"`
+	Dcslug string    `json:"dcslug"`
+	Name   string    `json:"name"`
+	ACL    []ACLRule `json:"aclRule,omitempty"`
 }
 
 type Frontend struct {
@@ -49,6 +50,18 @@ type Frontend struct {
 	CertificateName string `json:"certificateName,omitempty"`
 	RedirectHttps   bool   `json:"redirectHttps,omitempty"`
 	Cookie          bool   `json:"cookie,omitempty"`
+}
+
+type ACLRule struct {
+	Name          string  `json:"name"`
+	ConditionType string  `json:"conditionType"`
+	Value         ACLData `json:"value"`
+}
+
+type ACLData struct {
+	FrontendID string   `json:"frontend_id,omitempty"`
+	Type       string   `json:"type"`
+	Data       []string `json:"data"`
 }
 
 type TargetGroup struct {
@@ -86,6 +99,9 @@ const (
 	TGAttachmentPendingPhase StatusPhase = "TG_ATTACHMENT_PENDING"
 	TGAttachmentCreatedPhase StatusPhase = "TG_ATTACHMENT_CREATED"
 	TGAttachmentErrorPhase   StatusPhase = "TG_ATTACHMENT_PHASE"
+	ACLPendingPhase          StatusPhase = "ACL_PENDING"
+	ACLCreatedPhase          StatusPhase = "ACL_CREATED"
+	ACLErrorPhase            StatusPhase = "ACL_ERROR"
 )
 
 // UthoApplicationStatus defines the observed state of UthoApplication
@@ -94,7 +110,8 @@ type UthoApplicationStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 	LoadBalancerID string      `json:"load_balancer_id"`
 	FrontendID     string      `json:"frontend_id"`
-	TargetGroupsID []string    `json:"target_group_id,omitempty"`
+	TargetGroupsID []string    `json:"target_group_ids,omitempty"`
+	ACLRuleIDs     []string    `json:"acl_rule_ids,omitempty"`
 	Phase          StatusPhase `json:"phase"`
 }
 

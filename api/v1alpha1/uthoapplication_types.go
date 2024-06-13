@@ -109,16 +109,20 @@ type UthoApplicationStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 	LoadBalancerID string      `json:"load_balancer_id"`
+	LoadBalancerIP string      `json:"load_balancer_ip"`
 	FrontendID     string      `json:"frontend_id"`
 	TargetGroupsID []string    `json:"target_group_ids,omitempty"`
 	ACLRuleIDs     []string    `json:"acl_rule_ids,omitempty"`
 	Phase          StatusPhase `json:"phase"`
 }
 
-//+kubebuilder:object:root=true
-//+kubebuilder:subresource:status
-//+kubebuilder:resource:shortName={"utho-app"}
-
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+// +kubebuilder:resource:shortName={"utho-app"}
+// +kubebuilder:printcolumn:name="LoadBalancerI-P",type=string,JSONPath=`.status.load_balancer_ip`
+// +kubebuilder:printcolumn:name="LoadBalancer-Type",type=string,JSONPath=`.spec.loadBalancer.type`
+// +kubebuilder:printcolumn:name="Frontend-Port",type=integer,JSONPath=`.spec.loadBalancer.frontend.port`
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 // UthoApplication is the Schema for the uthoapplications API
 type UthoApplication struct {
 	metav1.TypeMeta   `json:",inline"`

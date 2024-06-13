@@ -45,6 +45,9 @@ func (r *UthoApplicationReconciler) CreateUthoLoadBalancer(ctx context.Context, 
 	app.Status.LoadBalancerID = newLB.ID
 	app.Status.Phase = appsv1alpha1.LBCreatedPhase
 
+	lb, _ := getLB(newLB.ID)
+	app.Status.LoadBalancerIP = lb.IP
+
 	fmt.Printf("%+v\n", newLB)
 	l.Info("Updating LB Details in the Status")
 	if err = r.Status().Update(ctx, app); err != nil {

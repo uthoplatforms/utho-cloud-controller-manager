@@ -16,7 +16,20 @@ spec:
     singular: uthoapplication
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - jsonPath: .status.load_balancer_ip
+      name: LoadBalancerI-P
+      type: string
+    - jsonPath: .spec.loadBalancer.type
+      name: LoadBalancer-Type
+      type: string
+    - jsonPath: .spec.loadBalancer.frontend.port
+      name: Frontend-Port
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: UthoApplication is the Schema for the uthoapplications API
@@ -157,6 +170,8 @@ spec:
                   of cluster Important: Run "make" to regenerate code after modifying
                   this file'
                 type: string
+              load_balancer_ip:
+                type: string
               phase:
                 type: string
               target_group_ids:
@@ -166,6 +181,7 @@ spec:
             required:
             - frontend_id
             - load_balancer_id
+            - load_balancer_ip
             - phase
             type: object
         type: object

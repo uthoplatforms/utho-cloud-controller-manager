@@ -10,21 +10,26 @@ import (
 	"strings"
 )
 
+// UpdateFrontend updates the frontend configuration of a load balancer based on the specified UthoApplication
 func (r *UthoApplicationReconciler) UpdateFrontend(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 
 	l.Info("Updating Frontend")
+	// Retrieve the frontend ID from the application's status
 	frontendID := app.Status.FrontendID
 	if frontendID == "" {
 		return errors.New(FrontendIDNotFound)
 	}
 
+	// Retrieve the load balancer ID from the application's status
 	lbID := app.Status.LoadBalancerID
 	if lbID == "" {
 		return errors.New(LBIDNotFound)
 	}
 
+	// Retrieve the frontend specifications from the application's spec
 	frontend := app.Spec.LoadBalancer.Frontend
 
+	// Create the parameters for updating the frontend
 	params := &utho.UpdateLoadbalancerFrontendParams{
 		LoadbalancerId: lbID,
 		Name:           frontend.Name,
@@ -35,6 +40,7 @@ func (r *UthoApplicationReconciler) UpdateFrontend(ctx context.Context, app *app
 		Cookie:         TrueOrFalse(frontend.Cookie),
 	}
 
+	// Get the certificate ID if the certificate name is provided
 	certificateID, err := getCertificateID(frontend.CertificateName, l)
 	if err != nil {
 		if err.Error() == CertificateIDNotFound {
@@ -44,13 +50,16 @@ func (r *UthoApplicationReconciler) UpdateFrontend(ctx context.Context, app *app
 		}
 	}
 
+	// Set the certificate ID in parameters
 	if certificateID != "" {
 		params.CertificateID = certificateID
 	} else {
 		params.CertificateID = "0"
 	}
 
+	// Log the parameters
 	l.Info("Update Frontend Params", "params", params)
+	// Update the parameters using Utho client
 	_, err = (*uthoClient).Loadbalancers().UpdateFrontend(*params, lbID, frontendID)
 	if err != nil {
 		return errors.Wrap(err, "Error Updating Frontend")
@@ -58,18 +67,20 @@ func (r *UthoApplicationReconciler) UpdateFrontend(ctx context.Context, app *app
 	return nil
 }
 
+// UpdateTargetGroups updates the target groups associated with an UthoApplication
 func (r *UthoApplicationReconciler) UpdateTargetGroups(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	tgs := app.Spec.TargetGroups
 
 	tgIds := app.Status.TargetGroupsID
 
 	l.Info("Updating Target Groups")
+	// Ensure the number of target groups matches the number of target group IDs
 	if len(tgIds) != len(tgs) {
 		return errors.New("Target groups Not Matching")
 	}
 
+	// Update each target group
 	for i, tg := range tgs {
-		//l.Info("Target Groups", "TGID:", tgIds[i], "TG:", tg)
 		if err := updateTargetGroup(&tg, tgIds[i], l); err != nil {
 			return err
 		}
@@ -77,8 +88,10 @@ func (r *UthoApplicationReconciler) UpdateTargetGroups(ctx context.Context, app 
 	return nil
 }
 
+// UpdateTargetGroup updates a single target group based on the provided parameters
 func updateTargetGroup(tg *appsv1alpha1.TargetGroup, id string, l *logr.Logger) error {
 
+	// Create the parameters for updating the target group
 	params := &utho.UpdateTargetGroupParams{
 		Name:                tg.Name,
 		TargetGroupId:       id,
@@ -93,54 +106,10 @@ func updateTargetGroup(tg *appsv1alpha1.TargetGroup, id string, l *logr.Logger) 
 	}
 
 	l.Info("Updating Target Group")
+	// Update the target group using the Utho client
 	_, err := (*uthoClient).TargetGroup().Update(*params)
 	if err != nil {
 		return errors.Wrapf(err, "Error Updating Target Group %s\n", id)
 	}
 	return nil
 }
-
-//func (r *UthoApplicationReconciler) UpdateACLRules(app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
-//
-//	l.Info("Updating ACL Rules")
-//
-//	acls := app.Spec.LoadBalancer.ACL
-//	aclIDs := app.Status.ACLRuleIDs
-//
-//	frontendID := app.Status.FrontendID
-//	lbID := app.Status.LoadBalancerID
-//
-//	if len(aclIDs) != len(acls) {
-//		return errors.New("ACL Rules Not Matching")
-//	}
-//	for i, aclID := range aclIDs {
-//		if err := UpdateACLRule(aclID, frontendID, lbID ,acls[i], l); err != nil {
-//
-//		}
-//	}
-//	return nil
-//}
-//
-//func UpdateACLRule(id, frontendID , lbID string, rule appsv1alpha1.ACLRule, l *logr.Logger) error {
-//
-//	if id == "" {
-//		return errors.New(ACLIDNotFound)
-//	}
-//
-//	l.Info("Updating ACL Rule")
-//	rule.Value.FrontendID = frontendID
-//	byteValue, err := json.Marshal(rule.Value)
-//	if err != nil {
-//		return errors.Wrap(err, "Error Marshalling ACL Rule")
-//	}
-//	params := utho.Updat{
-//		LoadbalancerId: lbID,
-//		Name:           rule.Name,
-//		ConditionType:  rule.ConditionType,
-//		FrontendID:     frontendID,
-//		Value:          string(byteValue),
-//	}
-//
-//	(*uthoClient).Loadbalancers().
-//	return nil
-//}

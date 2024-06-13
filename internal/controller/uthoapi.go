@@ -13,11 +13,13 @@ import (
 	"github.com/uthoplatforms/utho-go/utho"
 )
 
+// Declare global variables for Utho Client and error
 var (
 	uthoClient *utho.Client
 	err        error
 )
 
+// getAuthenticatedClient initialises and returns an authenticated Utho Client
 func getAuthenticatedClient() (*utho.Client, error) {
 	apiKey := os.Getenv("API_KEY")
 	client, err := utho.NewClient(apiKey)
@@ -27,6 +29,7 @@ func getAuthenticatedClient() (*utho.Client, error) {
 	return &client, nil
 }
 
+// CreateUthoLoadBalancer creates a new Load Balancer using the Utho API and updates the status of the application
 func (r *UthoApplicationReconciler) CreateUthoLoadBalancer(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	lbreq := utho.CreateLoadbalancerParams{
 		Dcslug: app.Spec.LoadBalancer.Dcslug,
@@ -38,6 +41,7 @@ func (r *UthoApplicationReconciler) CreateUthoLoadBalancer(ctx context.Context, 
 		return err
 	}
 
+	// Update the application status with the new Load Balancer ID and phase
 	app.Status.LoadBalancerID = newLB.ID
 	app.Status.Phase = appsv1alpha1.LBCreatedPhase
 
@@ -51,6 +55,7 @@ func (r *UthoApplicationReconciler) CreateUthoLoadBalancer(ctx context.Context, 
 
 }
 
+// CreateTargetGroups creates all target groups defined in the application's specifications
 func (r *UthoApplicationReconciler) CreateTargetGroups(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	for _, tg := range app.Spec.TargetGroups {
 		err := r.CreateTargetGroup(ctx, &tg, app, l)
@@ -69,6 +74,7 @@ func (r *UthoApplicationReconciler) CreateTargetGroups(ctx context.Context, app 
 	return nil
 }
 
+// CreateTargetGroup creates a single target group using the Utho API and updates the status of application
 func (r *UthoApplicationReconciler) CreateTargetGroup(ctx context.Context, tg *appsv1alpha1.TargetGroup, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	l.Info("Creating Target Group")
 
@@ -89,6 +95,7 @@ func (r *UthoApplicationReconciler) CreateTargetGroup(ctx context.Context, tg *a
 		//l.Error(err, "Unable to create TG")
 		return err
 	}
+	// Add the new target group ID to the application's status
 	l.Info("Adding TG ID to the Status Field")
 	app.Status.TargetGroupsID = append(app.Status.TargetGroupsID, fmt.Sprintf("%d", newTG.ID))
 	if err = r.Status().Update(ctx, app); err != nil {
@@ -98,6 +105,7 @@ func (r *UthoApplicationReconciler) CreateTargetGroup(ctx context.Context, tg *a
 	return nil
 }
 
+// AttachLBToCluster attaches the Load Balancer to the Kubernetes cluster using the Utho API
 func (r *UthoApplicationReconciler) AttachLBToCluster(ctx context.Context, kubernetesID string, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	lbID := app.Status.LoadBalancerID
 
@@ -119,6 +127,7 @@ func (r *UthoApplicationReconciler) AttachLBToCluster(ctx context.Context, kuber
 		return errors.Wrap(err, "Error Attaching LB to the Cluster")
 	}
 
+	// Update the application status phase to indicate LB attachment is created
 	app.Status.Phase = appsv1alpha1.LBAttachmentCreatedPhase
 	err = r.Status().Update(ctx, app)
 	if err != nil {
@@ -127,6 +136,7 @@ func (r *UthoApplicationReconciler) AttachLBToCluster(ctx context.Context, kuber
 	return nil
 }
 
+// AttachTargetGroupsToCluster attached all target groups to the Kubernetes cluster using the Utho API
 func (r *UthoApplicationReconciler) AttachTargetGroupsToCluster(ctx context.Context, kubernetesID string, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 
 	l.Info("Attaching Target Groups to the Cluster")
@@ -139,6 +149,7 @@ func (r *UthoApplicationReconciler) AttachTargetGroupsToCluster(ctx context.Cont
 		}
 	}
 
+	// Update the application status phase to indicate target group attachment is created
 	app.Status.Phase = appsv1alpha1.TGAttachmentCreatedPhase
 	err := r.Status().Update(ctx, app)
 	if err != nil {
@@ -147,6 +158,7 @@ func (r *UthoApplicationReconciler) AttachTargetGroupsToCluster(ctx context.Cont
 	return nil
 }
 
+// AttachTargetGroupToCluster attaches a singke target group cluster to the Kubernetes cluster using the Utho API
 func (r *UthoApplicationReconciler) AttachTargetGroupToCluster(tgID string, kubernetesID string, l *logr.Logger) error {
 	params := &utho.CreateKubernetesTargetgroupParams{
 		KubernetesId:            kubernetesID,
@@ -161,6 +173,7 @@ func (r *UthoApplicationReconciler) AttachTargetGroupToCluster(tgID string, kube
 	return nil
 }
 
+// CreateLBFrontend creates a frontend for the Load Balancer using the Utho API and updates the status of the application
 func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 
 	lbID := app.Status.LoadBalancerID
@@ -173,6 +186,7 @@ func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *a
 		return errors.Wrap(err, "Error Getting LB")
 	}
 
+	// Create frontend if none exists
 	if len(lb.Frontends) == 0 {
 		frontend := app.Spec.LoadBalancer.Frontend
 
@@ -212,6 +226,7 @@ func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *a
 			return errors.Wrap(err, "Error Updating Frontend in Status")
 		}
 	} else {
+		// If frontend already exists, update the application status with the existing frontend
 		app.Status.FrontendID = lb.Frontends[0].ID
 		app.Status.Phase = appsv1alpha1.FrontendCreatedPhase
 
@@ -223,6 +238,7 @@ func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *a
 	return nil
 }
 
+// CreateACLRules create ACL rules for the Load Balancer using Utho API and updates the status of the application
 func (r *UthoApplicationReconciler) CreateACLRules(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 
 	l.Info("Creating ACL Rules")
@@ -237,6 +253,7 @@ func (r *UthoApplicationReconciler) CreateACLRules(ctx context.Context, app *app
 		}
 	}
 
+	// Update the application status phase to indicate ACL Rules have been created is created
 	app.Status.Phase = appsv1alpha1.ACLCreatedPhase
 	if err := r.Status().Update(ctx, app); err != nil {
 		return errors.Wrap(err, "Error Updating ACL Created Phase")
@@ -246,6 +263,7 @@ func (r *UthoApplicationReconciler) CreateACLRules(ctx context.Context, app *app
 	return nil
 }
 
+// CreateACLRule creates a single ACL rule for the Load Balancer using Utho API
 func (r *UthoApplicationReconciler) CreateACLRule(ctx context.Context, app *appsv1alpha1.UthoApplication, rule appsv1alpha1.ACLRule, l *logr.Logger) error {
 	frontendID := app.Status.FrontendID
 	if frontendID == "" {
@@ -263,6 +281,7 @@ func (r *UthoApplicationReconciler) CreateACLRule(ctx context.Context, app *apps
 	if err != nil {
 		return errors.Wrap(err, "Error Marshalling ACL Rule")
 	}
+	// Creating parameters to create ACL Rule
 	params := utho.CreateLoadbalancerACLParams{
 		LoadbalancerId: lbID,
 		Name:           rule.Name,
@@ -275,6 +294,7 @@ func (r *UthoApplicationReconciler) CreateACLRule(ctx context.Context, app *apps
 		return err
 	}
 
+	// Updating ACL Rule ID to status of application
 	app.Status.ACLRuleIDs = append(app.Status.ACLRuleIDs, res.ID)
 	if err = r.Status().Update(ctx, app); err != nil {
 		return errors.Wrap(err, "Error Updating ACL Rule ID in Status Field")
@@ -282,20 +302,7 @@ func (r *UthoApplicationReconciler) CreateACLRule(ctx context.Context, app *apps
 	return nil
 }
 
-// func (r *UthoApplicationReconciler) FetchKubernetesID(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
-
-// 	ip := os.Getenv("HOST_IP")
-// 	uthoClient, err := getAuthenticatedClient()
-// 	if err != nil {
-// 		return errors.Wrap(err, "Unable to get Utho Client")
-// 	}
-
-// 	k8s, err := (*uthoClient).Kubernetes().List()
-// 	if err != nil {
-// 		return errors.Wrap(err, "Unable to List Kubernetes Clusters")
-// 	}
-
-// }
+// TGCreationOnwards manages the control flow from creation of target groups onwards and updates the application status
 func (r *UthoApplicationReconciler) TGCreationOnwards(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 
 	app.Status.Phase = appsv1alpha1.TGPendingPhase
@@ -318,6 +325,8 @@ func (r *UthoApplicationReconciler) TGCreationOnwards(ctx context.Context, app *
 	}
 	return nil
 }
+
+// LBAttachmentOnwards manages the control flow from Load Balancer attachment onwards and updates the application status
 func (r *UthoApplicationReconciler) LBAttachmentOnwards(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	app.Status.Phase = appsv1alpha1.LBAttachmentPendingPhase
 	if err := r.Status().Update(ctx, app); err != nil {
@@ -345,6 +354,7 @@ func (r *UthoApplicationReconciler) LBAttachmentOnwards(ctx context.Context, app
 	return nil
 }
 
+// TGAttachmentOnwards manages the control flow from Target Group attachment onwards and updates the application status
 func (r *UthoApplicationReconciler) TGAttachmentOnwards(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	app.Status.Phase = appsv1alpha1.TGAttachmentPendingPhase
 	if err := r.Status().Update(ctx, app); err != nil {
@@ -372,6 +382,7 @@ func (r *UthoApplicationReconciler) TGAttachmentOnwards(ctx context.Context, app
 	return nil
 }
 
+// FrontendCreationOnwards manages the control flow from Frontend Creation onwards and updates the application status
 func (r *UthoApplicationReconciler) FrontendCreationOnwards(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	app.Status.Phase = appsv1alpha1.FrontendPendingPhase
 	if err := r.Status().Update(ctx, app); err != nil {

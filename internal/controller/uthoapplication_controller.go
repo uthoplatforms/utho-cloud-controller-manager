@@ -70,6 +70,7 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	l := log.FromContext(ctx)
 	l.Info("Receieved Reconcile Request", req.Name, req.Namespace)
 
+	//Fetch the UthoApplication instance
 	app := &appsv1alpha1.UthoApplication{}
 
 	if err := r.Get(ctx, types.NamespacedName{Name: req.Name, Namespace: req.Namespace}, app); err != nil {
@@ -79,7 +80,7 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 		return ctrl.Result{RequeueAfter: errorRequeueDuration}, err
 	}
-	// Is the Object Marked for Deletion
+	// Check if the Object is Marked for Deletion
 	if !app.ObjectMeta.DeletionTimestamp.IsZero() {
 		l.Info("Application Marked for Deletion")
 		if containsString(app.ObjectMeta.Finalizers, finalizerID) {
@@ -94,7 +95,7 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return ctrl.Result{}, nil
 	}
 
-	// Add Finalizer if doesn't exists already
+	// Add Finalizer if it doesn't exists already
 	if !containsString(app.ObjectMeta.Finalizers, finalizerID) {
 		app.ObjectMeta.Finalizers = append(app.ObjectMeta.Finalizers, finalizerID)
 		if err := r.Update(ctx, app); err != nil {
@@ -102,6 +103,7 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		}
 	}
 
+	// Handle different phases of the application lifecycle
 	phase := app.Status.Phase
 	if phase == "" || phase == appsv1alpha1.LBPendingPhase || phase == appsv1alpha1.LBErrorPhase {
 		l.Info("Creating a new app from scratch")
@@ -196,6 +198,7 @@ func (r *UthoApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
+// createExternalResources creates the external resources required and as directed by the application
 func (r *UthoApplicationReconciler) createExternalResources(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	l.Info("Creating External Resources")
 
@@ -218,36 +221,10 @@ func (r *UthoApplicationReconciler) createExternalResources(ctx context.Context,
 	if err = r.TGCreationOnwards(ctx, app, l); err != nil {
 		return err
 	}
-
-	//if err = r.AttachTargetGroupsToCluster(ctx, kubernetesID, app, l); err != nil {
-	//	l.Error(err, "Unable to Attach Target Groups to Cluster")
-	//	app.Status.Phase = appsv1alpha1.TGAttachmentErrorPhase
-	//	if err := r.Status().Update(ctx, app); err != nil {
-	//		return err
-	//	}
-	//	return errors.Wrap(err, "Unable to Attach Target Groups to Cluster")
-	//}
-	//
-	//app.Status.Phase = appsv1alpha1.FrontendPendingPhase
-	//if err := r.Status().Update(ctx, app); err != nil {
-	//	return err
-	//}
-	//
-	//if err = r.CreateLBFrontend(ctx, app, l); err != nil {
-	//	l.Error(err, "Unable to Create Frontend")
-	//	app.Status.Phase = appsv1alpha1.FrontendErrorPhase
-	//	if err := r.Status().Update(ctx, app); err != nil {
-	//		return err
-	//	}
-	//	return errors.Wrap(err, "Unable to Create Frontend")
-	//}
-	//
-	//app.Status.Phase = appsv1alpha1.RunningPhase
-	//if err = r.Status().Update(ctx, app); err != nil {
-	//	return errors.Wrap(err, "Unable to add Running Phase")
-	//}
 	return nil
 }
+
+// deleteExternalResources deletes the external resources associated with the application
 func (r *UthoApplicationReconciler) deleteExternalResources(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	l.Info("Deleting External Resources")
 

@@ -1,5 +1,7 @@
 package controller
 
+// Declare global Error statuses to be used
+
 const (
 	CertificateIDNotFound string = "Certificate ID Not Found"
 	TGAlreadyAttached     string = "Requested Target group already part of this Cluster."

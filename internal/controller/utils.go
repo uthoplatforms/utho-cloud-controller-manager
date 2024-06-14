@@ -2,41 +2,11 @@ package controller
 
 import (
 	"context"
-	"flag"
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	"github.com/uthoplatforms/utho-go/utho"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
+	corev1 "k8s.io/api/core/v1"
 )
-
-// GetClientSet returns a Kubernetes clientSet that can be used to interact with the Kubernetes API
-func GetClientSet() (*kubernetes.Clientset, error) {
-	home := homedir.HomeDir()
-	kube := (home + "/.kube/config")
-
-	// Try to build the config from the default kubernetes file
-	config, err := clientcmd.BuildConfigFromFlags("", kube)
-	if err != nil {
-		// If the default config is not available, try to use the in-cluster config
-		config, err = rest.InClusterConfig()
-		if err != nil {
-			return nil, errors.Wrap(err, "Unable to get Kubernetes Config")
-		}
-	}
-	flag.Parse()
-
-	// Create the clientSet for the config
-	clientset, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		return nil, errors.Wrap(err, "Error Getting clientset")
-	}
-
-	return clientset, nil
-}
 
 // containsString checks if a string contains a specific string
 func containsString(slice []string, s string) bool {
@@ -68,23 +38,15 @@ func TrueOrFalse(b bool) string {
 	return "0"
 }
 
-// getClusterID gets the cluster ID from the labels of the nodes in the Kubernetes cluster
-func getClusterID(ctx context.Context, l *logr.Logger) (string, error) {
-	// Get the Kubernetes clientSet
-	clientset, err := GetClientSet()
-	if err != nil {
-		return "", errors.Wrap(err, "Error getting clientset")
+// getClusterID gets the cluster ID from the first node in the cluster
+func (r *UthoApplicationReconciler) getClusterID(ctx context.Context, l *logr.Logger) (string, error) {
+	nodeList := &corev1.NodeList{}
+	if err := r.Client.List(ctx, nodeList); err != nil {
+		return "", errors.Wrap(err, "Error Getting Node List")
 	}
 
 	l.Info("Fetching Cluster ID Label")
-	// List all the nodes in the cluster
-	nodes, err := clientset.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return "", errors.Wrap(err, "Error getting Kubernetes nodes")
-	}
-
-	// Get the cluster ID from the labels of the first node
-	clusterID := nodes.Items[0].Labels["cluster_id"]
+	clusterID := nodeList.Items[0].Labels["cluster_id"]
 	if clusterID == "" {
 		return "", errors.Wrap(err, "No Cluster ID found")
 	}

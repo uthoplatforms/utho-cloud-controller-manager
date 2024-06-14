@@ -336,7 +336,7 @@ func (r *UthoApplicationReconciler) LBAttachmentOnwards(ctx context.Context, app
 		return err
 	}
 
-	kubernetesID, err := getClusterID(ctx, l)
+	kubernetesID, err := r.getClusterID(ctx, l)
 	if err != nil {
 		return errors.Wrap(err, "Unable to Get Cluster ID")
 	}
@@ -364,7 +364,7 @@ func (r *UthoApplicationReconciler) TGAttachmentOnwards(ctx context.Context, app
 		return err
 	}
 
-	kubernetesID, err := getClusterID(ctx, l)
+	kubernetesID, err := r.getClusterID(ctx, l)
 	if err != nil {
 		return errors.Wrap(err, "Unable to Get Cluster ID")
 	}

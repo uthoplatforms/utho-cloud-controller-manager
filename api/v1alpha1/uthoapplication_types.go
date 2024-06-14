@@ -119,6 +119,7 @@ type UthoApplicationStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:shortName={"utho-app"}
+// +kubebuilder:printcolumn:name="Phase",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="Load-Balancer-IP",type=string,JSONPath=`.status.load_balancer_ip`
 // +kubebuilder:printcolumn:name="Load-Balancer-Type",type=string,JSONPath=`.spec.loadBalancer.type`
 // +kubebuilder:printcolumn:name="Frontend-Port",type=integer,JSONPath=`.spec.loadBalancer.frontend.port`

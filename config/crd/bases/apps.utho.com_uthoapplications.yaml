@@ -157,7 +157,6 @@ spec:
                 type: array
             required:
             - loadBalancer
-            - targetGroups
             type: object
           status:
             description: UthoApplicationStatus defines the observed state of UthoApplication

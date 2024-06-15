@@ -69,6 +69,9 @@ func (r *UthoApplicationReconciler) UpdateFrontend(ctx context.Context, app *app
 
 // UpdateTargetGroups updates the target groups associated with an UthoApplication
 func (r *UthoApplicationReconciler) UpdateTargetGroups(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+	if app.Spec.LoadBalancer.Type == "network" {
+		return nil
+	}
 	tgs := app.Spec.TargetGroups
 
 	tgIds := app.Status.TargetGroupsID

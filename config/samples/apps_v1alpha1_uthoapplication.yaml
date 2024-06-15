@@ -4,40 +4,14 @@ metadata:
   name: test-app
 spec:
   loadBalancer:
-    aclRule:
-      - name: test-rule
-        conditionType: url_path
-        value:
-          type: url_path
-          data:
-            - "/"
-            - "/path"
     frontend:
-      name: test-fe-3
-      algorithm: leastconn
+      name: test-fe-5
+      algorithm: roundrobin
       protocol: http
       port: 80
-    type: application
+    type: network
     dcslug: innoida
     name: test-lb
-  targetGroups:
-    - health_check_timeout: 5
-      health_check_interval: 30
-      health_check_path: /
-      health_check_protocol: TCP
-      healthy_threshold: 2
-      name: test-tg
-      protocol: TCP
-      unhealthy_threshold: 3
-      port: 30001
-    - health_check_timeout: 5
-      health_check_interval: 30
-      health_check_path: /
-      health_check_protocol: TCP
-      healthy_threshold: 2
-      name: test-tg-2
-      protocol: TCP
-      unhealthy_threshold: 2
-      port: 30002
+
     
 

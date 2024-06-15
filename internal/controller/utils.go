@@ -6,7 +6,18 @@ import (
 	"github.com/pkg/errors"
 	"github.com/uthoplatforms/utho-go/utho"
 	corev1 "k8s.io/api/core/v1"
+	"os"
 )
+
+// getAuthenticatedClient initialises and returns an authenticated Utho Client
+func getAuthenticatedClient() (*utho.Client, error) {
+	apiKey := os.Getenv("API_KEY")
+	client, err := utho.NewClient(apiKey)
+	if err != nil {
+		return nil, err
+	}
+	return &client, nil
+}
 
 // containsString checks if a string contains a specific string
 func containsString(slice []string, s string) bool {

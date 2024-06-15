@@ -30,7 +30,7 @@ type UthoApplicationSpec struct {
 
 	// Foo is an example field of UthoApplication. Edit uthoapplication_types.go to remove/update
 	LoadBalancer LoadBalancer  `json:"loadBalancer"`
-	TargetGroups []TargetGroup `json:"targetGroups"`
+	TargetGroups []TargetGroup `json:"targetGroups,omitempty"`
 }
 
 type LoadBalancer struct {

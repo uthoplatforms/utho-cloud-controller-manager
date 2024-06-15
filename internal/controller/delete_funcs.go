@@ -40,6 +40,9 @@ func (r *UthoApplicationReconciler) DeleteLB(ctx context.Context, app *appsv1alp
 
 func (r *UthoApplicationReconciler) DeleteTargetGroups(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 
+	if app.Spec.LoadBalancer.Type == "network" {
+		return nil
+	}
 	l.Info("Deleting Target Groups")
 	tgs := app.Status.TargetGroupsID
 

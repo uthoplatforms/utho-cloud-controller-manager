@@ -39,7 +39,6 @@ func (r *UthoApplicationReconciler) DeleteLB(ctx context.Context, app *appsv1alp
 // and updates the application's status to reflect the deletion.
 
 func (r *UthoApplicationReconciler) DeleteTargetGroups(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
-
 	if app.Spec.LoadBalancer.Type == "network" {
 		return nil
 	}

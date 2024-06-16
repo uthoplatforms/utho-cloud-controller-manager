@@ -5,13 +5,12 @@ metadata:
 spec:
   loadBalancer:
     frontend:
-      name: test-fe-5
-      algorithm: roundrobin
+      name: test-fe-3
+      algorithm: leastconn
       protocol: http
       port: 80
     type: network
     dcslug: innoida
     name: test-lb
 
-    
 

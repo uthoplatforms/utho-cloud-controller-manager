@@ -2,7 +2,7 @@ module github.com/uthoplatforms/utho-cloud-controller-manager
 
 go 1.21.6
 
-toolchain go1.21.10
+toolchain go1.22.3
 
 require (
 	github.com/onsi/ginkgo/v2 v2.11.0

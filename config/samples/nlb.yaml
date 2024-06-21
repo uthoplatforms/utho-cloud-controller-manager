@@ -1,7 +1,7 @@
 apiVersion: apps.utho.com/v1alpha1
 kind: UthoApplication
 metadata:
-  name: test-app
+  name: test-app-nlb
 spec:
   loadBalancer:
     frontend:

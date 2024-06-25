@@ -83,6 +83,9 @@ spec:
                       - value
                       type: object
                     type: array
+                  backendPort:
+                    format: int64
+                    type: integer
                   dcslug:
                     type: string
                   frontend:

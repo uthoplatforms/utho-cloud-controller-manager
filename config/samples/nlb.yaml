@@ -4,10 +4,11 @@ metadata:
   name: test-app-nlb
 spec:
   loadBalancer:
+    backendPort: 30080
     frontend:
-      name: test-fe-3
-      algorithm: leastconn
-      protocol: http
+      name: test-fe
+      algorithm: roundrobin
+      protocol: tcp
       port: 80
     type: network
     dcslug: innoida

@@ -34,7 +34,8 @@ type UthoApplicationSpec struct {
 }
 
 type LoadBalancer struct {
-	Frontend Frontend `json:"frontend,omitempty"`
+	Frontend    Frontend `json:"frontend,omitempty"`
+	BackendPort int64    `json:"backendPort,omitempty"`
 	// +kubebuilder:default:=application
 	Type   string    `json:"type,omitempty"`
 	Dcslug string    `json:"dcslug"`

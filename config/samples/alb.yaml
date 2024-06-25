@@ -11,11 +11,10 @@ spec:
           type: url_path
           data:
             - "/"
-            - "/path"
     frontend:
-      name: test-fe-3
-      algorithm: leastconn
-      protocol: http
+      name: test-fe
+      algorithm: roundrobin
+      protocol: tcp
       port: 80
     type: application
     dcslug: innoida
@@ -29,15 +28,6 @@ spec:
       name: test-tg
       protocol: TCP
       unhealthy_threshold: 3
-      port: 30001
-    - health_check_timeout: 5
-      health_check_interval: 30
-      health_check_path: /
-      health_check_protocol: TCP
-      healthy_threshold: 2
-      name: test-tg-2
-      protocol: TCP
-      unhealthy_threshold: 2
-      port: 30002
+      port: 30080
     
 

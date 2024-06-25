@@ -48,7 +48,9 @@ machine against the cluster that you have configured via your `KUBECONFIG`.
 <article id="work"></article>
 
 ### How it works
-Utho Application Controller provides a `UthoApplication` CRD to specify the deployment of network resources like Utho LB, Utho TG, etc. Here is an example of `UthoApplication.
+Utho Application Controller provides a `UthoApplication` CRD to specify the deployment of network resources like Utho LB, Utho TG, etc. Here is an example of `UthoApplication`.
+
+#### ALB Example
 ```yaml
 apiVersion: apps.utho.com/v1alpha1
 kind: UthoApplication
@@ -92,6 +94,25 @@ spec:
       protocol: TCP
       unhealthy_threshold: 4
       port: 30002
+```
+
+#### NLB example
+```yaml
+apiVersion: apps.utho.com/v1alpha1
+kind: UthoApplication
+metadata:
+  name: test-app-nlb
+spec:
+  loadBalancer:
+    backendPort: 30080
+    frontend:
+      name: test-fe
+      algorithm: roundrobin
+      protocol: tcp
+      port: 80
+    type: network
+    dcslug: innoida
+    name: test-lb
 ```
 You can choose to apply the CRD in any namespace that you want. However, we recommend to create a separate namespace so that you can track all of your CRs easily.
 

@@ -57,8 +57,6 @@ func (r *UthoApplicationReconciler) UpdateFrontend(ctx context.Context, app *app
 		params.CertificateID = "0"
 	}
 
-	// Log the parameters
-	l.Info("Update Frontend Params", "params", params)
 	// Update the parameters using Utho client
 	_, err = (*uthoClient).Loadbalancers().UpdateFrontend(*params, lbID, frontendID)
 	if err != nil {

@@ -92,6 +92,43 @@ func (r *UthoApplicationReconciler) CreateTargetGroup(ctx context.Context, tg *a
 	return nil
 }
 
+// CreateNLBBackend adds the Kubernetes Cluster as the Backend to the Load Balancer using the Utho API
+func (r *UthoApplicationReconciler) CreateNLBBackend(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+	lbID := app.Status.LoadBalancerID
+	if lbID == "" {
+		return errors.New(LBIDNotFound)
+	}
+	frontendID := app.Status.FrontendID
+	if frontendID == "" {
+		return errors.New(FrontendIDNotFound)
+	}
+
+	kubernetesID, err := r.getClusterID(ctx, l)
+	if err != nil {
+		return errors.Wrap(err, "Unable to Get Cluster ID")
+	}
+	l.Info("Creating Backend for NLB")
+	params := utho.CreateLoadbalancerBackendParams{
+		LoadbalancerId: lbID,
+		Cloudid:        kubernetesID,
+		BackendPort:    fmt.Sprintf("%d", app.Spec.LoadBalancer.BackendPort),
+		FrontendID:     frontendID,
+	}
+	_, err = (*uthoClient).Loadbalancers().CreateBackend(params)
+	if err != nil {
+		return errors.Wrap(err, "Error Creating Backend for NLB")
+	}
+
+	// Update the application status phase to indicate the backend has been created
+	app.Status.Phase = appsv1alpha1.ACLCreatedPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return errors.Wrap(err, "Error Updating Backend Created Phase")
+	}
+
+	l.Info("Backend Created")
+	return nil
+}
+
 // CreateLBFrontend creates a frontend for the Load Balancer using the Utho API and updates the status of the application
 func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 
@@ -160,7 +197,7 @@ func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *a
 // CreateACLRules create ACL rules for the Load Balancer using Utho API and updates the status of the application
 func (r *UthoApplicationReconciler) CreateACLRules(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
 	if app.Spec.LoadBalancer.Type == "network" {
-		return nil
+		return r.CreateNLBBackend(ctx, app, l)
 	}
 
 	l.Info("Creating ACL Rules")

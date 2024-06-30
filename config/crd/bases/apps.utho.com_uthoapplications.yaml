@@ -53,8 +53,6 @@ spec:
             description: UthoApplicationSpec defines the desired state of UthoApplication
             properties:
               loadBalancer:
-                description: Foo is an example field of UthoApplication. Edit uthoapplication_types.go
-                  to remove/update
                 properties:
                   aclRule:
                     items:
@@ -171,9 +169,6 @@ spec:
               frontend_id:
                 type: string
               load_balancer_id:
-                description: 'INSERT ADDITIONAL STATUS FIELD - define observed state
-                  of cluster Important: Run "make" to regenerate code after modifying
-                  this file'
                 type: string
               load_balancer_ip:
                 type: string

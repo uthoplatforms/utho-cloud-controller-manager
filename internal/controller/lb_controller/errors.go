@@ -1,4 +1,4 @@
-package controller
+package lb_controller
 
 // Declare global Error statuses to be used
 

@@ -14,23 +14,25 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package lb_controller
 
 import (
 	"context"
 	"fmt"
+	"github.com/uthoplatforms/utho-cloud-controller-manager/internal/controller"
 	"time"
 
 	"github.com/pkg/errors"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	predicate "sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	controllerOptions "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	appsv1alpha1 "github.com/uthoplatforms/utho-cloud-controller-manager/api/v1alpha1"
@@ -61,7 +63,7 @@ type UthoApplicationReconciler struct {
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.16.3/pkg/reconcile
 func init() {
-	uthoClient, err = getAuthenticatedClient()
+	uthoClient, err = controller.GetAuthenticatedClient()
 	if err != nil {
 		panic(fmt.Errorf("No API Key Present to get authenticated client: %v", err))
 	}
@@ -83,11 +85,11 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	// Check if the Object is Marked for Deletion
 	if !app.ObjectMeta.DeletionTimestamp.IsZero() {
 		l.Info("Application Marked for Deletion")
-		if containsString(app.ObjectMeta.Finalizers, finalizerID) {
+		if controller.ContainsString(app.ObjectMeta.Finalizers, finalizerID) {
 			if err := r.deleteExternalResources(ctx, app, &l); err != nil {
 				return ctrl.Result{}, err
 			}
-			app.ObjectMeta.Finalizers = removeString(app.ObjectMeta.Finalizers, finalizerID)
+			app.ObjectMeta.Finalizers = controller.RemoveString(app.ObjectMeta.Finalizers, finalizerID)
 			if err := r.Update(ctx, app); err != nil {
 				return ctrl.Result{}, errors.Wrap(err, "Could Not Remove Finalizer")
 			}
@@ -96,7 +98,7 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Add Finalizer if it doesn't exists already
-	if !containsString(app.ObjectMeta.Finalizers, finalizerID) {
+	if !controller.ContainsString(app.ObjectMeta.Finalizers, finalizerID) {
 		app.ObjectMeta.Finalizers = append(app.ObjectMeta.Finalizers, finalizerID)
 		if err := r.Update(ctx, app); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "Could Not Add Finalizer")
@@ -180,7 +182,7 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		// Update Logic
 
 		l.Info("Running Phase!")
-		if phase == appsv1alpha1.RunningPhase {
+		if phase != appsv1alpha1.RunningPhase {
 			app.Status.Phase = appsv1alpha1.RunningPhase
 			if err := r.Status().Update(ctx, app); err != nil {
 				return ctrl.Result{}, errors.Wrap(err, "Unable to add Running Phase")
@@ -212,6 +214,7 @@ func (r *UthoApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.UthoApplication{}).
 		WithEventFilter(pred).
+		WithOptions(controllerOptions.Options{MaxConcurrentReconciles: 2}).
 		Complete(r)
 }
 

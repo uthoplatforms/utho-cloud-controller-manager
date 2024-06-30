@@ -1,4 +1,4 @@
-package controller
+package lb_controller
 
 import (
 	"context"
@@ -114,7 +114,7 @@ func (r *UthoApplicationReconciler) LBAttachmentOnwards(ctx context.Context, app
 		return err
 	}
 
-	kubernetesID, err := r.getClusterID(ctx, l)
+	kubernetesID, err := r.GetClusterID(ctx, l)
 	if err != nil {
 		return errors.Wrap(err, "Unable to Get Cluster ID")
 	}
@@ -142,7 +142,7 @@ func (r *UthoApplicationReconciler) TGAttachmentOnwards(ctx context.Context, app
 		return err
 	}
 
-	kubernetesID, err := r.getClusterID(ctx, l)
+	kubernetesID, err := r.GetClusterID(ctx, l)
 	if err != nil {
 		return errors.Wrap(err, "Unable to Get Cluster ID")
 	}

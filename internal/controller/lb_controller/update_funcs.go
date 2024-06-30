@@ -1,4 +1,4 @@
-package controller
+package lb_controller
 
 import (
 	"context"
@@ -6,6 +6,7 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1alpha1 "github.com/uthoplatforms/utho-cloud-controller-manager/api/v1alpha1"
+	"github.com/uthoplatforms/utho-cloud-controller-manager/internal/controller"
 	"github.com/uthoplatforms/utho-go/utho"
 	"strings"
 )
@@ -36,12 +37,12 @@ func (r *UthoApplicationReconciler) UpdateFrontend(ctx context.Context, app *app
 		Proto:          strings.ToLower(frontend.Protocol),
 		Port:           fmt.Sprintf("%d", frontend.Port),
 		Algorithm:      strings.ToLower(frontend.Algorithm),
-		Redirecthttps:  TrueOrFalse(frontend.RedirectHttps),
-		Cookie:         TrueOrFalse(frontend.Cookie),
+		Redirecthttps:  controller.TrueOrFalse(frontend.RedirectHttps),
+		Cookie:         controller.TrueOrFalse(frontend.Cookie),
 	}
 
 	// Get the certificate ID if the certificate name is provided
-	certificateID, err := getCertificateID(frontend.CertificateName, l)
+	certificateID, err := GetCertificateID(frontend.CertificateName, l)
 	if err != nil {
 		if err.Error() == CertificateIDNotFound {
 			l.Info("Certificate ID not found")

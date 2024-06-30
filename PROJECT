@@ -17,4 +17,13 @@ resources:
   kind: UthoApplication
   path: github.com/uthoplatforms/utho-cloud-controller-manager/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: utho.com
+  group: apps
+  kind: UthoDNS
+  path: github.com/uthoplatforms/utho-cloud-controller-manager/api/v1alpha1
+  version: v1alpha1
 version: "3"

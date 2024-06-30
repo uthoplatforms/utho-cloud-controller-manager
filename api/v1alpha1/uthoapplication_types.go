@@ -25,10 +25,6 @@ import (
 
 // UthoApplicationSpec defines the desired state of UthoApplication
 type UthoApplicationSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of UthoApplication. Edit uthoapplication_types.go to remove/update
 	LoadBalancer LoadBalancer  `json:"loadBalancer"`
 	TargetGroups []TargetGroup `json:"targetGroups,omitempty"`
 }
@@ -77,38 +73,8 @@ type TargetGroup struct {
 	Port                int64  `json:"port"`
 }
 
-type StatusPhase string
-
-const (
-	RunningPhase             StatusPhase = "RUNNING"
-	LBPendingPhase           StatusPhase = "LB_PENDING"
-	LBCreatedPhase           StatusPhase = "LB_CREATED"
-	LBErrorPhase             StatusPhase = "LB_ERROR"
-	LBDeletedPhase           StatusPhase = "LB_DELETED"
-	LBDeletionErrorPhase     StatusPhase = "LB_DELETION_ERROR"
-	TGPendingPhase           StatusPhase = "TG_PENDING"
-	TGCreatedPhase           StatusPhase = "TG_CREATED"
-	TGErrorPhase             StatusPhase = "TG_ERROR"
-	TGDeletedPhase           StatusPhase = "TG_DELETED"
-	TGDeletionErrorPhase     StatusPhase = "TG_DELETION_ERROR"
-	LBAttachmentPendingPhase StatusPhase = "LB_ATTACHMENT_PENDING"
-	LBAttachmentCreatedPhase StatusPhase = "LB__ATTACHMENT_CREATED"
-	LBAttachmentErrorPhase   StatusPhase = "LB_ATTACHMENT_ERROR"
-	FrontendPendingPhase     StatusPhase = "FRONTEND_PENDING"
-	FrontendCreatedPhase     StatusPhase = "FRONTEND_CREATED"
-	FrontendErrorPhase       StatusPhase = "FRONTEND_ERROR"
-	TGAttachmentPendingPhase StatusPhase = "TG_ATTACHMENT_PENDING"
-	TGAttachmentCreatedPhase StatusPhase = "TG_ATTACHMENT_CREATED"
-	TGAttachmentErrorPhase   StatusPhase = "TG_ATTACHMENT_PHASE"
-	ACLPendingPhase          StatusPhase = "ACL_PENDING"
-	ACLCreatedPhase          StatusPhase = "ACL_CREATED"
-	ACLErrorPhase            StatusPhase = "ACL_ERROR"
-)
-
 // UthoApplicationStatus defines the observed state of UthoApplication
 type UthoApplicationStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
 	LoadBalancerID string      `json:"load_balancer_id"`
 	LoadBalancerIP string      `json:"load_balancer_ip"`
 	FrontendID     string      `json:"frontend_id"`

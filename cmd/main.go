@@ -18,6 +18,8 @@ package main
 
 import (
 	"flag"
+	dns "github.com/uthoplatforms/utho-cloud-controller-manager/internal/controller/dns_controller"
+	lb "github.com/uthoplatforms/utho-cloud-controller-manager/internal/controller/lb_controller"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -33,7 +35,6 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	appsv1alpha1 "github.com/uthoplatforms/utho-cloud-controller-manager/api/v1alpha1"
-	"github.com/uthoplatforms/utho-cloud-controller-manager/internal/controller"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -89,11 +90,19 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err = (&controller.UthoApplicationReconciler{
+	if err = (&lb.UthoApplicationReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "UthoApplication")
+		os.Exit(1)
+	}
+	if err = (&dns.UthoDNSReconciler{
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Recorder: mgr.GetEventRecorderFor("utho-dns_controller"),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "UthoDNS")
 		os.Exit(1)
 	}
 	//+kubebuilder:scaffold:builder

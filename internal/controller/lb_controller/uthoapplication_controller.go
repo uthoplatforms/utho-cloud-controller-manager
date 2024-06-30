@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/uthoplatforms/utho-cloud-controller-manager/internal/controller"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/pkg/errors"
@@ -211,10 +213,14 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 // SetupWithManager sets up the controller with the Manager.
 func (r *UthoApplicationReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	pred := predicate.GenerationChangedPredicate{}
+	numWorkers, err := strconv.Atoi(os.Getenv("NUM_WORKERS"))
+	if err != nil {
+		numWorkers = 1
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.UthoApplication{}).
 		WithEventFilter(pred).
-		WithOptions(controllerOptions.Options{MaxConcurrentReconciles: 2}).
+		WithOptions(controllerOptions.Options{MaxConcurrentReconciles: numWorkers}).
 		Complete(r)
 }
 

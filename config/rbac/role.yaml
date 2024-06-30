@@ -30,3 +30,29 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - apps.utho.com
+  resources:
+  - uthodns
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - apps.utho.com
+  resources:
+  - uthodns/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - apps.utho.com
+  resources:
+  - uthodns/status
+  verbs:
+  - get
+  - patch
+  - update

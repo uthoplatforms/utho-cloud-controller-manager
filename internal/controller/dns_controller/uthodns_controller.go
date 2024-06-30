@@ -26,11 +26,13 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
+	"os"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	controllerOptions "sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"strconv"
 
 	appsv1alpha1 "github.com/uthoplatforms/utho-cloud-controller-manager/api/v1alpha1"
 )
@@ -147,9 +149,13 @@ func (r *UthoDNSReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 // SetupWithManager sets up the controller with the Manager.
 func (r *UthoDNSReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	pred := predicate.GenerationChangedPredicate{}
+	numWorkers, err := strconv.Atoi(os.Getenv("NUM_WORKERS"))
+	if err != nil {
+		numWorkers = 1
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1alpha1.UthoDNS{}).
 		WithEventFilter(pred).
-		WithOptions(controllerOptions.Options{MaxConcurrentReconciles: 2}).
+		WithOptions(controllerOptions.Options{MaxConcurrentReconciles: numWorkers}).
 		Complete(r)
 }

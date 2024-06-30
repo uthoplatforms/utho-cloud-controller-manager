@@ -10,6 +10,9 @@
   - [Target Group Spec](#tg)
   - [Frontend Spec](#fe)
   - [ACL Spec](#acl)
+- [Utho DNS CRD Reference](#dns-crd)
+  - [Utho DNS Spec](#dnsspec)
+  - [DNS Record Spec](#dnsrecord)
 
 
 Utho Application Operator is a [Kubernetes Operator](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/) that is used to manage various resources required by your Kubernetes Based Application like Load Balancer, etc.
@@ -114,6 +117,26 @@ spec:
     dcslug: innoida
     name: test-lb
 ```
+### DNS Example
+```yaml
+apiVersion: apps.utho.com/v1alpha1
+kind: UthoDNS
+metadata:
+  name: my-dns
+  namespace: <namespace>
+spec:
+  domain: "example.com"
+  records:
+    - hostname: "www"
+      type: "A"
+      ttl: 300
+      value: "192.0.2.1"
+    - hostname: "mail"
+      type: "MX"
+      ttl: 300
+      value: "mail.example.com"
+      priority: 10
+```
 You can choose to apply the CRD in any namespace that you want. However, we recommend to create a separate namespace so that you can track all of your CRs easily.
 
 <article id="versioning"></article>
@@ -209,34 +232,35 @@ Specifies a target group configuration.
 | `unhealthy_threshold`   | `int64`                           | `2` |
 | `port`                  | `int64`                           | `80` |
 
-[//]: # (## API Calls Used in Order)
+### Utho DNS CRD Reference
 
-[//]: # (- Create Load Balancer - API Route - https://api.utho.com/v2/loadbalancer)
+<article id="dnsspec"></article>
 
-[//]: # (- Create Target Group &#40;API To Utho&#41;)
+#### UthoDNS
+Defines the desired state of the UthoDNS.
 
-[//]: # (- Get Control Plane IP from the cluster &#40;Kubernetes API&#41; - GET Node --label selctor = "node-role.kubernetes.io/control-plane". Status Field Internal IP)
+| FIELD         | DESCRIPTION                                             |
+|---------------|---------------------------------------------------------|
+| `apiVersion`  | `apps.utho.com/v1alpha1`                                |
+| `kind`        | `UthoDNS`                                               |
+| `metadata`    | Refer to Kubernetes API documentation for fields of metadata. |
+| `spec`        | `UthoDNSSpec`                                           |
 
-[//]: # (- List Kubernetes for the Account &#40;API to Utho&#41;)
+#### UthoDNSSpec
+Specifies the UthoDNS configuration.
 
-[//]: # (- Get Kubernetes ID from the result)
+| FIELD           | DESCRIPTION                                             |
+|-----------------|---------------------------------------------------------|
+| `dnsRecords`    | `[]DNSRecord`                                           |
+ | `domain`       | `string`                                                |
+<article id="dnsrecord"></article>
 
-[//]: # (- Attach Load Balancer to the Cluster)
+#### DNSRecord
+Specifies a DNS record configuration.
 
-[//]: # (- Attach Target Group to Cluster)
-
-[//]: # ()
-[//]: # (Important Issue: https://github.com/kubernetes-sigs/kubebuilder/issues/618)
-
-[//]: # ()
-[//]: # (	if app.Status.ObservedGeneration != app.ObjectMeta.Generation {)
-
-[//]: # (		app.Status.ObservedGeneration = app.ObjectMeta.Generation)
-
-[//]: # (		if err := r.Status&#40;&#41;.Update&#40;ctx, app&#41;; err != nil {)
-
-[//]: # (			l.Error&#40;err, "Couldn't Set Observed Generation"&#41;)
-
-[//]: # (			return ctrl.Result{}, errors.Wrap&#40;err, "Couldn't Set Observed Generation"&#41;)
-
-[//]: # (		})
+| FIELD      | DESCRIPTION                       | EXAMPLE VALUES           |
+|------------|-----------------------------------|--------------------------|
+| `hostname` | `string`                          | `test`                   |
+| `type`     | `string`                          | `A`, `CNAME`, `MX`, `TXT` |
+| `ttl`      | `int64`                           | `300`                    |
+| `value`    | `string`                          |  `1.1.1.1`                 |

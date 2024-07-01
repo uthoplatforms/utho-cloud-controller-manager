@@ -263,4 +263,8 @@ Specifies a DNS record configuration.
 | `hostname` | `string`                          | `test`                   |
 | `type`     | `string`                          | `A`, `CNAME`, `MX`, `TXT` |
 | `ttl`      | `int64`                           | `300`                    |
-| `value`    | `string`                          |  `1.1.1.1`                 |
+| `value`    | `string`                          |  `1.1.1.1`                |
+| `priority` | `int64`, optional                 | `10`                     |
+| `port`     | `int64`, optional                 | `80`                     |
+| `weight`   | `int64`, optional                 | `10`                     |
+| `portType` | `string`, optional                |         |

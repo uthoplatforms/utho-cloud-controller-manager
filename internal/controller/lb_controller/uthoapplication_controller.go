@@ -163,23 +163,6 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 			return ctrl.Result{}, errors.Wrap(err, "Unable to add Running Phase")
 		}
 		return ctrl.Result{}, nil
-	} else if phase == appsv1alpha1.LBDeletionErrorPhase {
-		// Delete Logic
-		l.Info("LB Deleting Phase")
-		if err := r.deleteExternalResources(ctx, app, &l); err != nil {
-			return ctrl.Result{}, err
-		}
-		return ctrl.Result{}, nil
-
-	} else if phase == appsv1alpha1.TGDeletionErrorPhase {
-		l.Info("TG Deletion Phase")
-		if err := r.DeleteTargetGroups(ctx, app, &l); err != nil {
-			l.Error(err, "Unable to Delete Target Groups")
-			app.Status.Phase = appsv1alpha1.TGDeletionErrorPhase
-			if err := r.Status().Update(ctx, app); err != nil {
-				return ctrl.Result{}, errors.Wrap(err, "Unable to Add TG Deletion Error Phase")
-			}
-		}
 	} else if phase == appsv1alpha1.RunningPhase || phase == appsv1alpha1.ACLCreatedPhase {
 		// Update Logic
 
@@ -260,6 +243,7 @@ func (r *UthoApplicationReconciler) deleteExternalResources(ctx context.Context,
 		if err := r.Status().Update(ctx, app); err != nil {
 			return errors.Wrap(err, "Unable to add LB Deletion Error Phase")
 		}
+		return err
 	}
 
 	if err := r.DeleteTargetGroups(ctx, app, l); err != nil {
@@ -268,6 +252,7 @@ func (r *UthoApplicationReconciler) deleteExternalResources(ctx context.Context,
 		if err := r.Status().Update(ctx, app); err != nil {
 			return errors.Wrap(err, "Unable to Add TG Deletion Error Phase")
 		}
+		return err
 	}
 	return nil
 }

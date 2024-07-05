@@ -10,5 +10,7 @@ const (
 	LBIDNotFound          string = "no lb id found in the status field"
 	TGAlreadyExists       string = "Target Group with same name already in your account, Please provide different name."
 	ACLAlreadyExists      string = "Duplicate Entry"
+	LBAlreadyDeleted      string = "Sorry we unable to find this load balancer or you dont have access!"
+	TGAlreadyDeleted      string = "Permission Denied, Possible reason not resource not exists."
 	ACLIDNotFound         string = "ACL ID Not Found"
 )

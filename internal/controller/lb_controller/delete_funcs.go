@@ -17,12 +17,19 @@ func (r *UthoApplicationReconciler) DeleteLB(ctx context.Context, app *appsv1alp
 	if lbID == "" {
 		return errors.New(LBIDNotFound)
 	}
+	app.Status.Phase = appsv1alpha1.LBDeletionPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return errors.Wrap(err, "Error Updating LB Deletion Pending Status.")
+	}
 
 	// Delete the Load Balancer using uthoClient
 	l.Info("Deleting LB")
 	_, err := (*uthoClient).Loadbalancers().Delete(lbID)
 	if err != nil {
-		return errors.Wrap(err, "Error Deleting LB")
+		if err.Error() != LBAlreadyDeleted {
+			return errors.Wrap(err, "Error Deleting LB")
+		}
+		l.Info("Load Balancer Already Deleted")
 	}
 
 	// Update the application's status to indicate that the Load Balancer has been deleted
@@ -44,6 +51,11 @@ func (r *UthoApplicationReconciler) DeleteTargetGroups(ctx context.Context, app 
 	l.Info("Deleting Target Groups")
 	tgs := app.Status.TargetGroupsID
 
+	app.Status.Phase = appsv1alpha1.TGDeletionPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return errors.Wrap(err, "Error Updating Target Groups Deletion Pending Status.")
+	}
+
 	// Iterate through all Target Groups and delete each one
 	for i, tg := range tgs {
 		if err := DeleteTargetGroup(tg, app.Spec.TargetGroups[i].Name); err != nil {
@@ -64,7 +76,9 @@ func (r *UthoApplicationReconciler) DeleteTargetGroups(ctx context.Context, app 
 func DeleteTargetGroup(id, name string) error {
 	_, err := (*uthoClient).TargetGroup().Delete(id, name)
 	if err != nil {
-		return errors.Wrapf(err, "Error Deleting Target Group with ID: %s znd Name: %s", id, name)
+		if err.Error() != TGAlreadyDeleted {
+			return errors.Wrapf(err, "Error Deleting Target Group with ID: %s and Name: %s", id, name)
+		}
 	}
 	return nil
 }

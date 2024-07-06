@@ -13,13 +13,22 @@ import (
 
 // UpdateFrontend updates the frontend configuration of a load balancer based on the specified UthoApplication
 func (r *UthoApplicationReconciler) UpdateFrontend(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
-
-	l.Info("Updating Frontend")
 	// Retrieve the frontend ID from the application's status
 	frontendID := app.Status.FrontendID
 	if frontendID == "" {
 		return errors.New(FrontendIDNotFound)
 	}
+
+	currFrontend, err := (*uthoClient).Loadbalancers().ReadFrontend(app.Status.LoadBalancerID, frontendID)
+	if err != nil {
+		return errors.Wrap(err, "Error fetching frontend")
+	}
+
+	if controller.IsFrontendEqual(currFrontend, app.Spec.LoadBalancer.Frontend) {
+		l.Info("No Change in Frontend")
+		return nil
+	}
+	l.Info("Updating Frontend")
 
 	// Retrieve the load balancer ID from the application's status
 	lbID := app.Status.LoadBalancerID
@@ -68,23 +77,56 @@ func (r *UthoApplicationReconciler) UpdateFrontend(ctx context.Context, app *app
 
 // UpdateTargetGroups updates the target groups associated with an UthoApplication
 func (r *UthoApplicationReconciler) UpdateTargetGroups(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
-	if app.Spec.LoadBalancer.Type == "network" {
+	if strings.ToLower(app.Spec.LoadBalancer.Type) == "network" || strings.ToLower(app.Spec.LoadBalancer.Type) != "application" {
 		return nil
 	}
-	tgs := app.Spec.TargetGroups
-
-	tgIds := app.Status.TargetGroupsID
+	//tgs := app.Spec.TargetGroups
+	//
+	//tgIds := app.Status.TargetGroupsID
 
 	l.Info("Updating Target Groups")
-	// Ensure the number of target groups matches the number of target group IDs
-	if len(tgIds) != len(tgs) {
-		return errors.New("Target groups Not Matching")
+
+	// Fetch the current target groups from the Utho API
+	currentTGs, err := (*uthoClient).TargetGroup().List()
+	if err != nil {
+		return errors.Wrap(err, "Error fetching target groups")
 	}
 
-	// Update each target group
-	for i, tg := range tgs {
-		if err := updateTargetGroup(&tg, tgIds[i], l); err != nil {
+	// Convert the current target groups to a map for easy lookup
+	currentTGMap := make(map[string]utho.TargetGroup)
+	for _, tg := range currentTGs {
+		currentTGMap[tg.Name] = tg
+	}
+
+	// Iterate through the target groups in the application spec
+	for _, specTG := range app.Spec.TargetGroups {
+		// If the target group exists in the Utho API, update it
+		if currentTG, ok := currentTGMap[specTG.Name]; ok {
+			if !controller.IsTargetGroupEqual(currentTG, specTG) {
+				if err := updateTargetGroup(&specTG, currentTG.ID, l); err != nil {
+					return err
+				}
+			}
+			// Remove the target group from the map
+			delete(currentTGMap, specTG.Name)
+		} else {
+			// If the target group does not exist in the Utho API, create it
+			err := r.CreateTargetGroup(ctx, &specTG, app, l)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	// Any remaining target groups in the map have been removed from the UthoApplication spec, so delete them
+	for _, tg := range currentTGMap {
+		if err := DeleteTargetGroup(tg.ID, tg.Name); err != nil {
 			return err
+		}
+		// Remove the deleted target group ID from the status
+		app.Status.TargetGroupsID = controller.RemoveID(app.Status.TargetGroupsID, tg.ID)
+		if err := r.Status().Update(ctx, app); err != nil {
+			return errors.Wrap(err, "Error Updating Application Status")
 		}
 	}
 	return nil
@@ -113,5 +155,24 @@ func updateTargetGroup(tg *appsv1alpha1.TargetGroup, id string, l *logr.Logger) 
 	if err != nil {
 		return errors.Wrapf(err, "Error Updating Target Group %s\n", id)
 	}
+	return nil
+}
+
+func (r *UthoApplicationReconciler) UpdateAClRules(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+	if strings.ToLower(app.Spec.LoadBalancer.Type) == "network" || strings.ToLower(app.Spec.LoadBalancer.Type) != "application" {
+		return nil
+	}
+
+	l.Info("Updating ACL Rules")
+
+	// Delete Existing Rules and Create New Rules
+	if err := r.DeleteACLRules(ctx, app.Status.LoadBalancerID, app, app.Status.ACLRuleIDs, l); err != nil {
+		return err
+	}
+
+	if err := r.CreateACLRules(ctx, app, l); err != nil {
+		return err
+	}
+
 	return nil
 }

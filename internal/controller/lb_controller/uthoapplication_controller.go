@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/uthoplatforms/utho-cloud-controller-manager/internal/controller"
+	"k8s.io/client-go/tools/record"
 	"os"
 	"strconv"
 	"time"
@@ -48,7 +49,8 @@ const (
 // UthoApplicationReconciler reconciles a UthoApplication object
 type UthoApplicationReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=apps.utho.com,resources=uthoapplications,verbs=get;list;watch;create;update;patch;delete
@@ -185,6 +187,11 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		//.Update Target Groups
 		if err := r.UpdateTargetGroups(ctx, app, &l); err != nil {
 			l.Error(err, "Error Updating TargetGroups")
+			return ctrl.Result{}, err
+		}
+
+		if err := r.UpdateAClRules(ctx, app, &l); err != nil {
+			l.Error(err, "Error Updating ACL Rules")
 			return ctrl.Result{}, err
 		}
 	}

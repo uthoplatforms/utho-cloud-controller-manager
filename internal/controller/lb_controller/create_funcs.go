@@ -42,7 +42,7 @@ func (r *UthoApplicationReconciler) CreateUthoLoadBalancer(ctx context.Context, 
 
 // CreateTargetGroups creates all target groups defined in the application's specifications
 func (r *UthoApplicationReconciler) CreateTargetGroups(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
-	if app.Spec.LoadBalancer.Type == "network" {
+	if strings.ToLower(app.Spec.LoadBalancer.Type) == "network" || strings.ToLower(app.Spec.LoadBalancer.Type) != "application" {
 		return nil
 	}
 	for _, tg := range app.Spec.TargetGroups {
@@ -197,14 +197,14 @@ func (r *UthoApplicationReconciler) CreateLBFrontend(ctx context.Context, app *a
 
 // CreateACLRules create ACL rules for the Load Balancer using Utho API and updates the status of the application
 func (r *UthoApplicationReconciler) CreateACLRules(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
-	if app.Spec.LoadBalancer.Type == "network" {
+
+	if strings.ToLower(app.Spec.LoadBalancer.Type) == "network" || strings.ToLower(app.Spec.LoadBalancer.Type) != "application" {
 		return r.CreateNLBBackend(ctx, app, l)
 	}
-
 	l.Info("Creating ACL Rules")
 	rules := app.Spec.LoadBalancer.ACL
 	for _, rule := range rules {
-		if err := r.CreateACLRule(ctx, app, rule, l); err != nil {
+		if err := r.CreateACLRule(ctx, app, &rule, l); err != nil {
 			if err.Error() == ACLAlreadyExists {
 				l.Info("ACL Rule already exists")
 				continue
@@ -224,7 +224,7 @@ func (r *UthoApplicationReconciler) CreateACLRules(ctx context.Context, app *app
 }
 
 // CreateACLRule creates a single ACL rule for the Load Balancer using Utho API
-func (r *UthoApplicationReconciler) CreateACLRule(ctx context.Context, app *appsv1alpha1.UthoApplication, rule appsv1alpha1.ACLRule, l *logr.Logger) error {
+func (r *UthoApplicationReconciler) CreateACLRule(ctx context.Context, app *appsv1alpha1.UthoApplication, rule *appsv1alpha1.ACLRule, l *logr.Logger) error {
 	frontendID := app.Status.FrontendID
 	if frontendID == "" {
 		return errors.New(FrontendIDNotFound)

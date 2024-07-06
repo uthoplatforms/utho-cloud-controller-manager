@@ -5,6 +5,8 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
 	appsv1alpha1 "github.com/uthoplatforms/utho-cloud-controller-manager/api/v1alpha1"
+	"github.com/uthoplatforms/utho-cloud-controller-manager/internal/controller"
+	"strings"
 )
 
 // DeleteLB deletes the Load Balancer associated with the UthoApplication
@@ -45,7 +47,7 @@ func (r *UthoApplicationReconciler) DeleteLB(ctx context.Context, app *appsv1alp
 // and updates the application's status to reflect the deletion.
 
 func (r *UthoApplicationReconciler) DeleteTargetGroups(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
-	if app.Spec.LoadBalancer.Type == "network" {
+	if strings.ToLower(app.Spec.LoadBalancer.Type) == "network" || strings.ToLower(app.Spec.LoadBalancer.Type) != "application" {
 		return nil
 	}
 	l.Info("Deleting Target Groups")
@@ -79,6 +81,31 @@ func DeleteTargetGroup(id, name string) error {
 		if err.Error() != TGAlreadyDeleted {
 			return errors.Wrapf(err, "Error Deleting Target Group with ID: %s and Name: %s", id, name)
 		}
+	}
+	return nil
+}
+
+func (r *UthoApplicationReconciler) DeleteACLRules(ctx context.Context, lbID string, app *appsv1alpha1.UthoApplication, ids []string, l *logr.Logger) error {
+	newIDs := ids
+
+	l.Info("Deleting ACL Rules")
+	for _, id := range ids {
+		if err := DeleteACLRule(lbID, id); err != nil {
+			return err
+		}
+		newIDs = controller.RemoveID(newIDs, id)
+	}
+	app.Status.ACLRuleIDs = newIDs
+	if err := r.Status().Update(ctx, app); err != nil {
+		return errors.Wrap(err, "Error Updating ACL Rules Status")
+	}
+	return nil
+}
+
+func DeleteACLRule(lbID, aclID string) error {
+	_, err := (*uthoClient).Loadbalancers().DeleteACL(lbID, aclID)
+	if err != nil {
+		return errors.Wrap(err, "Error Deleting ACL Rule")
 	}
 	return nil
 }

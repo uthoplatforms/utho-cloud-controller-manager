@@ -33,10 +33,11 @@ type LoadBalancer struct {
 	Frontend    Frontend `json:"frontend,omitempty"`
 	BackendPort int64    `json:"backendPort,omitempty"`
 	// +kubebuilder:default:=application
-	Type   string    `json:"type,omitempty"`
-	Dcslug string    `json:"dcslug"`
-	Name   string    `json:"name"`
-	ACL    []ACLRule `json:"aclRule,omitempty"`
+	Type                 string                `json:"type,omitempty"`
+	Dcslug               string                `json:"dcslug"`
+	Name                 string                `json:"name"`
+	ACL                  []ACLRule             `json:"aclRule,omitempty"`
+	AdvancedRoutingRules []AdvancedRoutingRule `json:"advancedRoutingRules,omitempty"`
 }
 
 type Frontend struct {
@@ -73,14 +74,21 @@ type TargetGroup struct {
 	Port                int64  `json:"port"`
 }
 
+type AdvancedRoutingRule struct {
+	ACLName          string   `json:"aclName"`
+	RouteCondition   bool     `json:"routeCondition"`
+	TargetGroupNames []string `json:"targetGroupNames"`
+}
+
 // UthoApplicationStatus defines the observed state of UthoApplication
 type UthoApplicationStatus struct {
-	LoadBalancerID string      `json:"load_balancer_id"`
-	LoadBalancerIP string      `json:"load_balancer_ip"`
-	FrontendID     string      `json:"frontend_id"`
-	TargetGroupsID []string    `json:"target_group_ids,omitempty"`
-	ACLRuleIDs     []string    `json:"acl_rule_ids,omitempty"`
-	Phase          StatusPhase `json:"phase"`
+	LoadBalancerID          string      `json:"load_balancer_id"`
+	LoadBalancerIP          string      `json:"load_balancer_ip"`
+	FrontendID              string      `json:"frontend_id"`
+	TargetGroupsID          []string    `json:"target_group_ids,omitempty"`
+	ACLRuleIDs              []string    `json:"acl_rule_ids,omitempty"`
+	AdvancedRoutingRulesIDs []string    `json:"advanced_routing_rules_ids,omitempty"`
+	Phase                   StatusPhase `json:"phase"`
 }
 
 // +kubebuilder:object:root=true

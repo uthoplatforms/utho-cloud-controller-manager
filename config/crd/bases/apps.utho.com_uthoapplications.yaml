@@ -81,6 +81,23 @@ spec:
                       - value
                       type: object
                     type: array
+                  advancedRoutingRules:
+                    items:
+                      properties:
+                        aclName:
+                          type: string
+                        routeCondition:
+                          type: boolean
+                        targetGroupNames:
+                          items:
+                            type: string
+                          type: array
+                      required:
+                      - aclName
+                      - routeCondition
+                      - targetGroupNames
+                      type: object
+                    type: array
                   backendPort:
                     format: int64
                     type: integer
@@ -163,6 +180,10 @@ spec:
             description: UthoApplicationStatus defines the observed state of UthoApplication
             properties:
               acl_rule_ids:
+                items:
+                  type: string
+                type: array
+              advanced_routing_rules_ids:
                 items:
                   type: string
                 type: array

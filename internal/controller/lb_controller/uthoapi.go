@@ -185,12 +185,33 @@ func (r *UthoApplicationReconciler) FrontendCreationOnwards(ctx context.Context,
 		return errors.Wrap(err, "Unable to Update ACL Pending Status")
 	}
 
-	if err = r.CreateACLRules(ctx, app, l); err != nil {
+	if err = r.ACLCreationOnwards(ctx, app, l); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *UthoApplicationReconciler) ACLCreationOnwards(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+	if err := r.CreateACLRules(ctx, app, l); err != nil {
+		l.Error(err, "Unable to Create ACL Rules")
+		app.Status.Phase = appsv1alpha1.ACLErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return errors.Wrap(err, "Unable to add ACL Error Phase")
+		}
+		return err
+	}
+
+	if err := r.CreateAdvancedRoutingRules(ctx, app, l); err != nil {
+		l.Error(err, "Unable to Create Advanced Routing Rules")
+		app.Status.Phase = appsv1alpha1.AdvancedRoutingErrorPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return errors.Wrap(err, "Unable to add Advanced Routing Error Phase")
+		}
 		return err
 	}
 
 	app.Status.Phase = appsv1alpha1.RunningPhase
-	if err = r.Status().Update(ctx, app); err != nil {
+	if err := r.Status().Update(ctx, app); err != nil {
 		return errors.Wrap(err, "Unable to add Running Phase")
 	}
 	return nil

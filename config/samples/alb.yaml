@@ -4,6 +4,12 @@ metadata:
   name: test-app-alb
 spec:
   loadBalancer:
+    advancedRoutingRules:
+      - aclName: test-rule
+        routeCondition: true
+        targetGroupNames:
+        - test-tg-4
+        - test-tg-5
     aclRule:
       - name: test-rule
         conditionType: url_path
@@ -11,6 +17,7 @@ spec:
           type: url_path
           data:
             - "/"
+            - "/path"
     frontend:
       name: test-fe
       algorithm: roundrobin

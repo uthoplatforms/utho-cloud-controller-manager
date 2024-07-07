@@ -152,28 +152,33 @@ func (r *UthoApplicationReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	} else if phase == appsv1alpha1.FrontendCreatedPhase || phase == appsv1alpha1.ACLPendingPhase || phase == appsv1alpha1.ACLErrorPhase {
 
 		l.Info("Into ACl Creation Phase")
-		if err := r.CreateACLRules(ctx, app, &l); err != nil {
-			l.Error(err, "Unable to create ACL Rules")
-			app.Status.Phase = appsv1alpha1.ACLErrorPhase
+		if err := r.ACLCreationOnwards(ctx, app, &l); err != nil {
+			return ctrl.Result{}, err
+		}
+
+		return ctrl.Result{}, nil
+	} else if phase == appsv1alpha1.ACLCreatedPhase || phase == appsv1alpha1.AdvancedRoutingPendingPhase || phase == appsv1alpha1.AdvancedRoutingErrorPhase {
+		l.Info("Into Advanced Routing Phase", "phase", phase)
+		if err := r.CreateAdvancedRoutingRules(ctx, app, &l); err != nil {
+			l.Error(err, "Unable to Create Advanced Routing Rules")
+			app.Status.Phase = appsv1alpha1.AdvancedRoutingErrorPhase
 			if err := r.Status().Update(ctx, app); err != nil {
-				return ctrl.Result{}, errors.Wrap(err, "Unable to add ACL Error Phase")
+				return ctrl.Result{}, errors.Wrap(err, "Unable to add Advanced Routing Error Phase")
 			}
 			return ctrl.Result{}, err
 		}
+
 		app.Status.Phase = appsv1alpha1.RunningPhase
 		if err := r.Status().Update(ctx, app); err != nil {
 			return ctrl.Result{}, errors.Wrap(err, "Unable to add Running Phase")
 		}
-		return ctrl.Result{}, nil
 	} else if phase == appsv1alpha1.RunningPhase || phase == appsv1alpha1.ACLCreatedPhase {
 		// Update Logic
 
 		l.Info("Running Phase!")
-		if phase != appsv1alpha1.RunningPhase {
-			app.Status.Phase = appsv1alpha1.RunningPhase
-			if err := r.Status().Update(ctx, app); err != nil {
-				return ctrl.Result{}, errors.Wrap(err, "Unable to add Running Phase")
-			}
+		app.Status.Phase = appsv1alpha1.RunningPhase
+		if err := r.Status().Update(ctx, app); err != nil {
+			return ctrl.Result{}, errors.Wrap(err, "Unable to add Running Phase")
 		}
 		//Update Frontend
 		if err := r.UpdateFrontend(ctx, app, &l); err != nil {

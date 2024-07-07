@@ -9,6 +9,7 @@ import (
 	appsv1alpha1 "github.com/uthoplatforms/utho-cloud-controller-manager/api/v1alpha1"
 	"github.com/uthoplatforms/utho-cloud-controller-manager/internal/controller"
 	"github.com/uthoplatforms/utho-go/utho"
+	"strconv"
 	"strings"
 )
 
@@ -212,8 +213,7 @@ func (r *UthoApplicationReconciler) CreateACLRules(ctx context.Context, app *app
 			return err
 		}
 	}
-
-	// Update the application status phase to indicate ACL Rules have been created is created
+	// Update the application status phase to indicate ACL Rules have been created
 	app.Status.Phase = appsv1alpha1.ACLCreatedPhase
 	if err := r.Status().Update(ctx, app); err != nil {
 		return errors.Wrap(err, "Error Updating ACL Created Phase")
@@ -259,5 +259,91 @@ func (r *UthoApplicationReconciler) CreateACLRule(ctx context.Context, app *apps
 	if err = r.Status().Update(ctx, app); err != nil {
 		return errors.Wrap(err, "Error Updating ACL Rule ID in Status Field")
 	}
+	return nil
+}
+
+func (r *UthoApplicationReconciler) CreateAdvancedRoutingRules(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+	if strings.ToLower(app.Spec.LoadBalancer.Type) == "network" || strings.ToLower(app.Spec.LoadBalancer.Type) != "application" {
+		return nil
+	}
+	l.Info("Creating Advanced Routing Rules")
+
+	app.Status.Phase = appsv1alpha1.AdvancedRoutingPendingPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return errors.Wrap(err, "Error Updating Advanced Routing Pending Phase")
+	}
+	rules := app.Spec.LoadBalancer.AdvancedRoutingRules
+	for _, rule := range rules {
+		if err := r.CreateAdvancedRoutingRule(ctx, app, &rule, l); err != nil {
+			return err
+		}
+	}
+
+	app.Status.Phase = appsv1alpha1.AdvancedRoutingCreatedPhase
+	if err := r.Status().Update(ctx, app); err != nil {
+		return errors.Wrap(err, "Error Updating Advanced Routing Created Phase")
+	}
+	return nil
+}
+
+func (r *UthoApplicationReconciler) CreateAdvancedRoutingRule(ctx context.Context, app *appsv1alpha1.UthoApplication, rule *appsv1alpha1.AdvancedRoutingRule, l *logr.Logger) error {
+	lbID := app.Status.LoadBalancerID
+	if lbID == "" {
+		return errors.New(LBIDNotFound)
+	}
+
+	l.Info("Creating Advanced Routing Rule")
+
+	params := &utho.CreateLoadbalancerRouteParams{
+		LoadbalancerId: lbID,
+		FrontendID:     app.Status.FrontendID,
+		RouteCondition: strconv.FormatBool(rule.RouteCondition),
+	}
+
+	for i, acl := range app.Spec.LoadBalancer.ACL {
+		if acl.Name == rule.ACLName {
+			params.ACLID = app.Status.ACLRuleIDs[i]
+		}
+	}
+
+	tgMap := make(map[string]string)
+	for i, tg := range app.Spec.TargetGroups {
+		tgMap[strings.ToLower(tg.Name)] = app.Status.TargetGroupsID[i]
+	}
+
+	var tgIDs string
+	for _, tgName := range rule.TargetGroupNames {
+		tgID, ok := tgMap[strings.ToLower(tgName)]
+		if !ok {
+			r.Recorder.Event(app, "Warning", "TargetGroupNotFound", fmt.Sprintf("Target Group %s not found in Spec", tgName))
+		}
+		tgIDs = tgIDs + "," + tgID
+	}
+
+	params.TargetGroups = strings.TrimPrefix(tgIDs, ",")
+	l.Info("Advanced", "params", params)
+
+	_, err := (*uthoClient).Loadbalancers().CreateRoute(*params)
+	if err != nil {
+		if err.Error() == LBAlreadyDeleted {
+			l.Info("No LB Found")
+			return nil
+		}
+		if err.Error() == RoutingRuleAlreadyExists {
+			l.Info("Routing Rule Already Exists")
+			//if !controller.ContainsString(app.Status.AdvancedRoutingRulesIDs, res.ID) {
+			//	app.Status.AdvancedRoutingRulesIDs = append(app.Status.AdvancedRoutingRulesIDs, res.ID)
+			//	if err = r.Status().Update(ctx, app); err != nil {
+			//		return errors.Wrap(err, "Error Updating Advanced Routing Rule ID in Status Field")
+			//	}
+			//}
+			return nil
+		}
+		return errors.Wrap(err, "Error Creating Routing Rule")
+	}
+	//app.Status.AdvancedRoutingRulesIDs = append(app.Status.AdvancedRoutingRulesIDs, res.ID)
+	//if err = r.Status().Update(ctx, app); err != nil {
+	//	return errors.Wrap(err, "Error Updating Advanced Routing Rule ID in Status Field")
+	//}
 	return nil
 }

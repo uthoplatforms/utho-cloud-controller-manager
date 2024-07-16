@@ -85,7 +85,7 @@ spec:
       health_check_protocol: TCP
       healthy_threshold: 2
       name: test-tg-blaa
-      protocol: TCP
+      protocol: HTTP
       unhealthy_threshold: 3
       port: 30002
     - health_check_timeout: 5
@@ -94,7 +94,7 @@ spec:
       health_check_protocol: TCP
       healthy_threshold: 2
       name: test-tg-2
-      protocol: TCP
+      protocol: HTTP
       unhealthy_threshold: 4
       port: 30002
 ```

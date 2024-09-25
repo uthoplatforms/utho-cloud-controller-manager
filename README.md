@@ -24,6 +24,13 @@ With this Operator, you can do the following:
 
 <article id="prerequiites"></article>
 
+### Examples
+
+Here are some examples of how you could leverage `utho-cloud-controller-manager`:
+
+* [Network loadbalancers](examples/network)
+* [Applicaton loadbalancers](examples/application)
+
 ### Prerequisites
 
 In order to build the operator you'll have to have Go installed on your machine.

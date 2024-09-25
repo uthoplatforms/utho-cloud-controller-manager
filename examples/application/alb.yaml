@@ -1,0 +1,28 @@
+apiVersion: apps.utho.com/v1alpha1
+kind: UthoApplication
+metadata:
+  name: nginx
+  namespace: dev
+spec:
+  loadBalancer:
+    frontend:
+      name: nginx
+      algorithm: roundrobin
+      protocol: tcp
+      port: 80
+    type: application
+    dcslug: innoida
+    name: nginx
+  targetGroups:
+    - health_check_timeout: 5
+      health_check_interval: 30
+      health_check_path: /
+      health_check_protocol: TCP
+      healthy_threshold: 2
+      name: nginx
+      protocol: TCP
+      unhealthy_threshold: 3
+      port: 30088
+
+    
+

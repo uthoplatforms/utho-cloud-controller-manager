@@ -4,6 +4,8 @@ Utho cloud controller manager runs service controller, which is
 responsible for watching Custom services called `UthoApplication` and creating Loadbalancer inside Utho platform
 loadbalancers to satify its requirements. 
 
+Make sure you have the controller installed first [Install](../README.md#install-the-controller).
+
 Here are some examples of how it's used.
 
 ## Examples

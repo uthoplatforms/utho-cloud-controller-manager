@@ -24,8 +24,27 @@ With this Operator, you can do the following:
 
 <article id="prerequiites"></article>
 
-### Examples
+## Install the controller
+### Prerequisites
+- You need to have [Helm CLI](https://helm.sh/docs/helm/helm_install/) installed on your machine.
+- You must have an [Utho API Key](https://console.utho.com/api).
 
+### Installing the Cloud Controller Chart
+To install the chart with the release name `utho-app-operator`:
+
+Add the Utho Operator Repository to your Helm repositories:
+```bash
+helm repo add utho-operator https://uthoplatforms.github.io/utho-app-operator-helm/
+```
+
+Install the Utho Operator Chart:
+
+Note: make sure to set the Utho API Key
+```bash
+helm install <release_name> utho-operator/utho-app-operator-chart --version 0.1.2 --set API_KEY=<YOUR_API_KEY> -n <namespace> --create-namespace
+```
+
+## Examples
 Here are some examples of how you could leverage `utho-cloud-controller-manager`:
 
 * [Network loadbalancers](examples/network)

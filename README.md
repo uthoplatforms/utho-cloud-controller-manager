@@ -1,7 +1,8 @@
 # Utho Application Operator
 ## Table of Contents
-- [Prerequisites](#prerequiites)
-- [Build Process](#build)
+- [Install the controller](#install-the-controller)
+- [Examples](#examples)
+- [Build](#build-the-operator)
 - [How it Works](#work)
 - [Versioning](#versioning)
 - [Utho Application CRD Reference](#crd)
@@ -24,7 +25,7 @@ With this Operator, you can do the following:
 
 <article id="prerequiites"></article>
 
-w## Install the controller
+## Install the controller
 ### Prerequisites
 - You need to have [Helm CLI](https://helm.sh/docs/helm/helm_install/) installed on your machine.
 - You must have an [Utho API Key](https://console.utho.com/api).

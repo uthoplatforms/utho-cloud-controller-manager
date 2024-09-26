@@ -24,7 +24,7 @@ With this Operator, you can do the following:
 
 <article id="prerequiites"></article>
 
-## Install the controller
+w## Install the controller
 ### Prerequisites
 - You need to have [Helm CLI](https://helm.sh/docs/helm/helm_install/) installed on your machine.
 - You must have an [Utho API Key](https://console.utho.com/api).
@@ -47,8 +47,8 @@ helm install <release_name> utho-operator/utho-app-operator-chart --version 0.1.
 ## Examples
 Here are some complete examples of an application leveraging `utho-cloud-controller-manager`:
 
-* [Network loadbalancers](examples/network)
-* [Applicaton loadbalancers](examples/application)
+* [Network Load balancer](examples/network)
+* [Applicaton Load balancer](examples/application)
 
 ### Prerequisites
 

@@ -45,7 +45,7 @@ helm install <release_name> utho-operator/utho-app-operator-chart --version 0.1.
 ```
 
 ## Examples
-Here are some examples of how you could leverage `utho-cloud-controller-manager`:
+Here are some complete examples of an application leveraging `utho-cloud-controller-manager`:
 
 * [Network loadbalancers](examples/network)
 * [Applicaton loadbalancers](examples/application)

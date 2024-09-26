@@ -50,6 +50,8 @@ Here are some complete examples of an application leveraging `utho-cloud-control
 * [Network Load balancer](examples/network)
 * [Applicaton Load balancer](examples/application)
 
+## Build the operator
+
 ### Prerequisites
 
 In order to build the operator you'll have to have Go installed on your machine.

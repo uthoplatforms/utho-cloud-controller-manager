@@ -29,7 +29,7 @@ With this Operator, you can do the following:
 - You need to have [Helm CLI](https://helm.sh/docs/helm/helm_install/) installed on your machine.
 - You must have an [Utho API Key](https://console.utho.com/api).
 
-### Installing the Cloud Controller Chart
+### Install the Cloud Controller Helm Chart
 To install the chart with the release name `utho-app-operator`:
 
 Add the Utho Operator Repository to your Helm repositories:

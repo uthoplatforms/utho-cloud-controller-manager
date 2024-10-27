@@ -8,31 +8,6 @@ rules:
   - apps.utho.com
   resources:
   - uthoapplications
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - apps.utho.com
-  resources:
-  - uthoapplications/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - apps.utho.com
-  resources:
-  - uthoapplications/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - apps.utho.com
-  resources:
   - uthodns
   verbs:
   - create
@@ -45,12 +20,14 @@ rules:
 - apiGroups:
   - apps.utho.com
   resources:
+  - uthoapplications/finalizers
   - uthodns/finalizers
   verbs:
   - update
 - apiGroups:
   - apps.utho.com
   resources:
+  - uthoapplications/status
   - uthodns/status
   verbs:
   - get

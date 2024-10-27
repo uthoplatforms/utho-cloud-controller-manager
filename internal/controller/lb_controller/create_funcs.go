@@ -15,9 +15,20 @@ import (
 
 // CreateUthoLoadBalancer creates a new Load Balancer using the Utho API and updates the status of the application
 func (r *UthoApplicationReconciler) CreateUthoLoadBalancer(ctx context.Context, app *appsv1alpha1.UthoApplication, l *logr.Logger) error {
+	kubernetesID, err := r.GetClusterID(ctx, l)
+	if err != nil {
+		return err
+	}
+
+	vpcId, err := GetVpcId(kubernetesID)
+	if err != nil {
+		return err
+	}
+
 	lbreq := utho.CreateLoadbalancerParams{
 		Dcslug: app.Spec.LoadBalancer.Dcslug,
 		Type:   app.Spec.LoadBalancer.Type,
+		Vpc:    vpcId,
 		Name:   app.Spec.LoadBalancer.Name,
 	}
 	newLB, err := (*uthoClient).Loadbalancers().Create(lbreq)

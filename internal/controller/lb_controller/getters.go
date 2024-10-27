@@ -58,3 +58,13 @@ func GetCertificateID(certName string, l *logr.Logger) (string, error) {
 	}
 	return "", errors.New(CertificateIDNotFound)
 }
+
+// GetLB gets the load balancer with the specified ID using the Utho client
+func GetVpcId(id string) (string, error) {
+	k8s, err := (*uthoClient).Kubernetes().Read(id)
+	if err != nil {
+		return "", errors.Wrap(err, "Unable to get VPC Id")
+	}
+
+	return k8s.Info.Cluster.Vpc, nil
+}

@@ -38,11 +38,15 @@ Add the Utho Operator Repository to your Helm repositories:
 helm repo add utho-operator https://uthoplatforms.github.io/utho-app-operator-helm/
 ```
 
+```bash
+helm repo update
+```
+
 Install the Utho Operator Chart:
 
 Note: make sure to set the Utho API Key
 ```bash
-helm install <release_name> utho-operator/utho-app-operator-chart --version 0.1.3 --set API_KEY=<YOUR_API_KEY> -n <namespace> --create-namespace
+helm install <release_name> utho-operator/utho-app-operator-chart --version 0.1.3 --set API_KEY=<YOUR_API_KEY> --set image.tag=0.1.4 -n <namespace> --create-namespace
 ```
 
 ## Examples

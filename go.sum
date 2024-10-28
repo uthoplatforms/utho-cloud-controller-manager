@@ -90,6 +90,8 @@ github.com/stretchr/testify v1.9.0 h1:HtqpIVDClZ4nwg75+f6Lvsy/wHu+3BoSGCbBAcpTsT
 github.com/stretchr/testify v1.9.0/go.mod h1:r2ic/lqez/lEtzL7wO/rwa5dbSLXVDPFyf8C91i36aY=
 github.com/uthoplatforms/utho-go v0.1.25 h1:p7Fncm5pzOLafOtXh4LkiE6L0WI6Q8zdVceyGxtOSXM=
 github.com/uthoplatforms/utho-go v0.1.25/go.mod h1:tA5Mz7SX1RNdGh+WMriazdkl5RvS0X6hkvlrhmFdegY=
+github.com/uthoplatforms/utho-go v0.1.26 h1:0NtC/Zw6CenpBtB9A45PB5isHrhvzW81k/rsRNUoFJs=
+github.com/uthoplatforms/utho-go v0.1.26/go.mod h1:tA5Mz7SX1RNdGh+WMriazdkl5RvS0X6hkvlrhmFdegY=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.2.1/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 go.uber.org/goleak v1.3.0 h1:2K3zAYmnTNqV73imy9J1T3WC+gmCePx2hEGkimedGto=

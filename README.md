@@ -218,6 +218,7 @@ Specifies the load balancer configuration.
 | `name`          | `string`                                                | `my-lb`        | 
 | `aclRule`       | `[]ACLRule`, optional                                    |                |
 
+Available DCSlug are as innoida,inmumbaizone2,inbangalore,defra1,uslosangeles
 <article id="fe"></article>
 
 #### Frontend

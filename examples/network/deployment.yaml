@@ -25,15 +25,3 @@ spec:
           image: nginx:latest
           ports:
             - containerPort: 80
-          env:
-            # Expose secerets as environment variables
-            - name: NGINX_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: nginx-secret
-                  key: username
-            - name: NGINX_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: nginx-secret
-                  key: password

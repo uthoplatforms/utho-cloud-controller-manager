@@ -46,11 +46,11 @@ Install the Utho Operator Chart:
 
 Note: make sure to set the Utho API Key
 ```bash
-helm install <release_name> utho-operator/utho-app-operator-chart --version 0.1.5 --set API_KEY=<YOUR_API_KEY> --set image.tag=0.1.4 -n <namespace> --create-namespace
+helm install <release_name> utho-operator/utho-app-operator-chart --set API_KEY=<YOUR_API_KEY> -n <namespace> --create-namespace
 ```
 Example:
 ```bash
-helm install utho-app-operator utho-operator/utho-app-operator-chart --version 0.1.5 --set API_KEY=################## --set image.tag=0.1.4 -n dev --create-namespace
+helm install utho-app-operator utho-operator/utho-app-operator-chart --set API_KEY=################## -n dev --create-namespace
 ```
 
 ## Examples

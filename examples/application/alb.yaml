@@ -5,6 +5,11 @@ metadata:
   namespace: dev
 spec:
   loadBalancer:
+    advancedRoutingRules:
+      - aclName: nginx
+        routeCondition: true
+        targetGroupNames:
+          - nginx
     frontend:
       name: nginx
       algorithm: roundrobin
@@ -23,6 +28,3 @@ spec:
       protocol: TCP
       unhealthy_threshold: 3
       port: 30088
-
-    
-

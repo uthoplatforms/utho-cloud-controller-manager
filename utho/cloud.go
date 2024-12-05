@@ -30,11 +30,6 @@ type cloud struct {
 	loadbalancers cloudprovider.LoadBalancer
 }
 
-func (c *cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
-	klog.V(5).Info("called InstancesV2")
-	return c.instances, true
-}
-
 func init() {
 	cloudprovider.RegisterCloudProvider(ProviderName, func(_ io.Reader) (i cloudprovider.Interface, err error) {
 		return newCloud()
@@ -86,6 +81,11 @@ func (c *cloud) LoadBalancer() (cloudprovider.LoadBalancer, bool) {
 
 func (c *cloud) Instances() (cloudprovider.Instances, bool) {
 	return nil, false
+}
+
+func (c *cloud) InstancesV2() (cloudprovider.InstancesV2, bool) {
+	klog.V(5).Info("called InstancesV2")
+	return c.instances, true
 }
 
 func (c *cloud) Zones() (cloudprovider.Zones, bool) {

@@ -1,30 +1,35 @@
 VERSION ?= $VERSION
 REGISTRY ?= $REGISTRY
 
+.PHONY: tidy
+tidy: 
+	go mod tidy
+	go fmt ./...
+
 .PHONY: deploy
 deploy: clean docker-build docker-push
 
 .PHONY: build
-build:
-	@echo "building vultr ccm"
-	go build -trimpath -o dist/vultr-cloud-controller-manager .
+build: tidy
+	@echo "building utho ccm"
+	go build -trimpath -o utho-cloud-controller-manager .
 
 .PHONY: build-linux
 build-linux:
-	@echo "building vultr ccm for linux"
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o dist/vultr-cloud-controller-manager .
+	@echo "building utho ccm for linux"
+	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o dist/utho-cloud-controller-manager .
 
 .PHONY: docker-build
 docker-build:
 	@echo "building docker image to dockerhub $(REGISTRY) with version $(VERSION)"
-	docker build . -t $(REGISTRY)/vultr-cloud-controller-manager:$(VERSION)
+	docker build . -t $(REGISTRY)/utho-cloud-controller-manager:$(VERSION)
 
 .PHONY: docker-push
 docker-push:
-	docker push $(REGISTRY)/vultr-cloud-controller-manager:$(VERSION)
+	docker push $(REGISTRY)/utho-cloud-controller-manager:$(VERSION)
 
 .PHONY: clean
-clean:
+clean: tidy
 	go clean -i -x ./...
 
 .PHONY: test

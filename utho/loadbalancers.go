@@ -255,3 +255,69 @@ func buildInstanceList(nodes []*v1.Node) ([]string, error) {
 
 	return list, nil
 }
+
+// CreateUthoLoadBalancer sets up a load balancer, its frontend, and backend configurations
+func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1.Service, nodePoolId []string, clusterId string) (*utho.CreateLoadbalancerResponse, error) {
+	// Create load balancer request parameters
+	lbRequest := utho.CreateLoadbalancerParams{
+		Name:           lbName,
+		Dcslug:         l.zone,
+		Vpc:            vpcId,
+		Type:           "network",
+		EnablePublicip: "true",
+		Cpumodel:       "amd",
+	}
+	klog.Infof("Load balancer request: %+v", lbRequest)
+
+	// Create the load balancer
+	lb, err := l.client.Loadbalancers().Create(lbRequest)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create lb: %w", err)
+	}
+
+	// Iterate over each service port to configure frontend and backend
+	for _, port := range service.Spec.Ports {
+		// Ensure the protocol is TCP
+		if port.Protocol != v1.ProtocolTCP {
+			return nil, fmt.Errorf("only TCP protocol is supported, got: %q", port.Protocol)
+		}
+
+		// Create load balancer frontend request parameters
+		feRequest := utho.CreateLoadbalancerFrontendParams{
+			LoadbalancerId: lb.ID,
+			Name:           GenerateRandomString(10),
+			Proto:          "tcp",
+			Port:           string(port.Port),
+			Algorithm:      "roundrobin",
+		}
+		klog.Infof("Load balancer frontend request: %+v", feRequest)
+
+		// Create the load balancer frontend
+		lbFe, err := l.client.Loadbalancers().CreateFrontend(feRequest)
+		if err != nil {
+			return nil, fmt.Errorf("error creating load balancer frontend: %v", err)
+		}
+
+		// Configure backends for each node pool
+		for _, id := range nodePoolId {
+			feBackend := utho.CreateLoadbalancerBackendParams{
+				LoadbalancerId: lb.ID,
+				FrontendID:     lbFe.ID,
+				Type:           "kubernetes",
+				BackendPort:    string(port.NodePort),
+				Cloudid:        clusterId,
+				PoolName:       id,
+			}
+			klog.Infof("Load balancer backend request: %+v", feBackend)
+
+			// Create the load balancer backend
+			_, err := l.client.Loadbalancers().CreateBackend(feBackend)
+			if err != nil {
+				return nil, fmt.Errorf("error creating load balancer backend: %v", err)
+			}
+		}
+	}
+
+	// Return the created load balancer
+	return lb, nil
+}

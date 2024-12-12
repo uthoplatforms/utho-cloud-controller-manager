@@ -28,7 +28,7 @@ func newLoadbalancers(client utho.Client, zone string) cloudprovider.LoadBalance
 	return &loadbalancers{client: client, zone: zone}
 }
 
-// Retrieve the status, existence, and errors for a LoadBalancer associated with a service.
+// GetLoadBalancer retrieves the LoadBalancer status, existence, and any errors for a given service.
 func (l *loadbalancers) GetLoadBalancer(ctx context.Context, _ string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
 	lb, err := l.getUthoLB(ctx, service)
 	if err != nil {
@@ -61,20 +61,32 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		return nil, err
 	}
 
-	// if exists is false and the err above was nil then this is errLbNotFound
+	// if Load balancer doesn't exist
 	if !exists {
 		klog.Infof("Load balancer for cluster %q doesn't exist, creating", clusterName)
 
 		lbName := l.GetLoadBalancerName(context.Background(), "", service)
 
-		x := utho.CreateLoadbalancerParams{
-			Name:     lbName,
-			Dcslug:   l.zone,
-			Type:     "network",
-			Vpc:      annoVultrVPC,
-			Firewall: annoVultrFirewallRules,
+		// get cluster id
+		clusterId, err := GetLabelValue("cluster_id")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get cluster ID: %w", err)
 		}
-		lb, err := l.client.Loadbalancers().Create(x)
+
+		// get vpc id
+		vpcId, err := GetLabelValue("vpc_id")
+		if err != nil {
+			return nil, fmt.Errorf("failed to get vpc ID: %w", err)
+		}
+
+		// get nodepool id
+		nodePoolId, err := GetNodePoolsID()
+		if err != nil {
+			return nil, fmt.Errorf("failed to get nodepool ID: %w", err)
+		}
+
+		lb, err := l.CreateUthoLoadBalancer(lbName, vpcId, service, nodePoolId, clusterId)
+
 		if err != nil {
 			return nil, fmt.Errorf("failed to create load-balancer: %s", err)
 		}

@@ -13,8 +13,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-// GetClusterID gets the cluster ID from the first node in the cluster
-func GetClusterID() (string, error) {
+// GetLabelValue retrieves the value of a specified label from the first node in the cluster
+func GetLabelValue(labelKey string) (string, error) {
 	clientset, err := GetKubeClient()
 	if err != nil {
 		return "", fmt.Errorf("error creating Kubernetes client: %v", err)
@@ -32,11 +32,11 @@ func GetClusterID() (string, error) {
 	firstNode := nodes.Items[0]
 
 	labels := firstNode.GetLabels()
-	if clusterID, exists := labels["cluster_id"]; exists {
-		return clusterID, nil
+	if labelValue, exists := labels[labelKey]; exists {
+		return labelValue, nil
 	}
 
-	return "", fmt.Errorf("`cluster_id` label not found on the first node")
+	return "", fmt.Errorf("`%s` label not found on the first node", labelKey)
 }
 
 // GetNodePoolsID retrieves all unique node pool IDs from the nodes in the cluster

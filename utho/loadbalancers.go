@@ -279,133 +279,58 @@ func (l *loadbalancers) GetKubeClient() error {
 	return nil
 }
 
-func getSSLPassthrough(service *v1.Service) bool {
-	passThrough, ok := service.Annotations[annoVultrLBSSLPassthrough]
-	if !ok {
-		return false
-	}
-
-	pass, err := strconv.ParseBool(passThrough)
+func (l *loadbalancers) lbByName(lbName string) (*utho.Loadbalancer, error) {
+	lbs, err := l.client.Loadbalancers().List()
 	if err != nil {
-		return false
+		return nil, err
 	}
-	return pass
-}
-
-func getProxyProtocol(service *v1.Service) bool {
-	proxy, ok := service.Annotations[annoVultrProxyProtocol]
-	if !ok {
-		return false
-	}
-
-	pass, err := strconv.ParseBool(proxy)
-	if err != nil {
-		return false
+	for _, lb := range lbs {
+		if lb.Name == lbName {
+			return &lb, nil
+		}
 	}
 
 	return pass
 }
 
-func buildFirewallRules(service *v1.Service) ([]govultr.LBFirewallRule, error) {
-	lbFWRules := []govultr.LBFirewallRule{}
-	fwRules := getFirewallRules(service)
-	if fwRules == "" {
-		return lbFWRules, nil
-	}
-
-	for _, v := range strings.Split(fwRules, ";") {
-		fwRule := govultr.LBFirewallRule{}
-
-		rules := strings.Split(v, ",")
-		if len(rules) != 2 {
-			return nil, fmt.Errorf("loadbalancer fw rules : %s invalid configuration", rules)
-		}
-
-		source := rules[0]
-		ipType := "v4"
-		if source != "cloudflare" {
-			ip, _, err := net.ParseCIDR(source)
-			if err != nil {
-				return nil, fmt.Errorf("loadbalancer fw rules : source %s is invalid", source)
-			}
-
-			if ip.To4() == nil {
-				ipType = "v6"
-			}
-		}
-
-		port, err := strconv.Atoi(rules[1])
+func (l *loadbalancers) getUthoLB(ctx context.Context, service *v1.Service) (*utho.Loadbalancer, error) {
+	if id, ok := service.Annotations[annoUthoLoadBalancerID]; ok {
+		lb, err := l.client.Loadbalancers().Read(id)
 		if err != nil {
-			return nil, fmt.Errorf("loadbalancer fw rules : port %d is invalid", port)
+			return nil, err
 		}
-
-		fwRule.Source = source
-		fwRule.IPType = ipType
-		fwRule.Port = port
-		lbFWRules = append(lbFWRules, fwRule)
-	}
-	return lbFWRules, nil
-}
-
-func getFirewallRules(service *v1.Service) string {
-	fwRules, ok := service.Annotations[annoVultrFirewallRules]
-	if !ok {
-		return ""
+		return lb, nil
 	}
 
-	return fwRules
-}
-
-func getVPC(service *v1.Service) (string, error) {
-	var vpc string
-	pn, pnOk := service.Annotations[annoVultrPrivateNetwork]
-	v, vpcOk := service.Annotations[annoVultrVPC]
-
-	if vpcOk && pnOk {
-		return "", fmt.Errorf("can not use private_network and vpc annotations. Please use VPC as private network is deprecated")
-	} else if pnOk {
-		vpc = pn
-	} else if vpcOk {
-		vpc = v
+	defaultLBName := getDefaultLBName(service)
+	if lb, err := l.lbByName(defaultLBName); err != nil {
+		lbName := l.GetLoadBalancerName(ctx, "", service)
+		lb, err = l.lbByName(lbName)
+		if err != nil {
+			return nil, err
+		}
+		return lb, nil
 	} else {
-		return "", nil
+		return lb, nil
 	}
-
-	if strings.EqualFold(vpc, "false") {
-		return "", nil
-	}
-
-	meta := metadata.NewClient()
-	m, err := meta.Metadata()
-	if err != nil {
-		return "", fmt.Errorf("error getting metadata for private_network: %v", err.Error())
-	}
-
-	pnID := ""
-	for _, v := range m.Interfaces {
-		if v.NetworkV2ID != "" {
-			pnID = v.NetworkV2ID
-			break
-		}
-	}
-
-	return pnID, nil
 }
 
-func getBackendProtocol(service *v1.Service) string {
-	proto, ok := service.Annotations[annoVultrLBBackendProtocol]
-	if !ok {
-		return ""
+func getDefaultLBName(service *v1.Service) string {
+	return cloudprovider.DefaultLoadBalancerName(service)
+}
+
+// buildInstanceList create list of nodes to be attached to a load balancer
+func buildInstanceList(nodes []*v1.Node) ([]string, error) {
+	var list []string
+
+	for _, node := range nodes {
+		instanceID, err := getInstanceIDFromProviderID(node)
+		if err != nil {
+			return nil, fmt.Errorf("error getting the provider ID %s : %s", node.Spec.ProviderID, err)
+		}
+
+		list = append(list, instanceID)
 	}
 
-	switch proto {
-	case "http":
-		return protocolHTTP
-	case "https":
-		return protocolHTTPS
-	case "tcp":
-		return protocolTCP
-	default:
-		return ""
-	}
+	return list, nil
 }

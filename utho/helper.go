@@ -39,30 +39,37 @@ func GetClusterID() (string, error) {
 	return "", fmt.Errorf("`cluster_id` label not found on the first node")
 }
 
-// GetClusterID gets the cluster ID from the first node in the cluster
-func GetNodePoolID() (string, error) {
+// GetNodePoolsID retrieves all unique node pool IDs from the nodes in the cluster
+func GetNodePoolsID() ([]string, error) {
 	clientset, err := GetKubeClient()
 	if err != nil {
-		return "", fmt.Errorf("error creating Kubernetes client: %v", err)
+		return nil, fmt.Errorf("error creating Kubernetes client: %v", err)
 	}
 
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return "", fmt.Errorf("error retrieving nodes: %v", err)
+		return nil, fmt.Errorf("error retrieving nodes: %v", err)
 	}
 
 	if len(nodes.Items) == 0 {
-		return "", fmt.Errorf("no nodes found in the cluster")
+		return nil, fmt.Errorf("no nodes found in the cluster")
 	}
 
-	firstNode := nodes.Items[0]
-
-	labels := firstNode.GetLabels()
-	if clusterID, exists := labels["cluster_id"]; exists {
-		return clusterID, nil
+	nodePoolIDs := make(map[string]struct{})
+	for _, node := range nodes.Items {
+		labels := node.GetLabels()
+		if nodePoolId, exists := labels["nodepool_id"]; exists {
+			nodePoolIDs[nodePoolId] = struct{}{}
+		}
 	}
 
-	return "", fmt.Errorf("`cluster_id` label not found on the first node")
+	// Convert map keys to a slice
+	uniqueNodePoolIDs := make([]string, 0, len(nodePoolIDs))
+	for id := range nodePoolIDs {
+		uniqueNodePoolIDs = append(uniqueNodePoolIDs, id)
+	}
+
+	return uniqueNodePoolIDs, nil
 }
 
 func GetDcslug(client utho.Client, clusterId string) (string, error) {

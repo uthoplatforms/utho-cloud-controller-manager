@@ -28,7 +28,7 @@ func newLoadbalancers(client utho.Client, zone string) cloudprovider.LoadBalance
 	return &loadbalancers{client: client, zone: zone}
 }
 
-// GetLoadBalancer retrieves the LoadBalancer status, existence, and any errors for a given service.
+// Retrieve the status, existence, and errors for a LoadBalancer associated with a service.
 func (l *loadbalancers) GetLoadBalancer(ctx context.Context, _ string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
 	lb, err := l.getUthoLB(ctx, service)
 	if err != nil {

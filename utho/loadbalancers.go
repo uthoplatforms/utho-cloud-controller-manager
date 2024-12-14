@@ -169,8 +169,108 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	return lbStatus, nil
 }
 
-// UpdateLoadBalancer updates the configuration of the specified Kubernates LoadBalancer.
+// UpdateLoadBalancer updates the configuration of the specified Kubernetes LoadBalancer.
 func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
+	klog.V(3).Info("Called UpdateLoadBalancers")
+
+	// Check if the load balancer already exists
+	if _, _, err := l.GetLoadBalancer(ctx, clusterName, service); err != nil {
+		return err
+	}
+
+	// Retrieve the Utho load balancer
+	lb, err := l.getUthoLB(ctx, service)
+	if err != nil {
+		return err
+	}
+
+	// Ensure the Utho load balancer ID annotation is set
+	if service.Annotations == nil {
+		service.Annotations = make(map[string]string)
+	}
+	if _, ok := service.Annotations[annoUthoLoadBalancerID]; !ok {
+		service.Annotations[annoUthoLoadBalancerID] = lb.ID
+		if err := l.GetKubeClient(); err != nil {
+			return fmt.Errorf("failed to get kubeclient to update service: %w", err)
+		}
+		_, err = l.kubeClient.CoreV1().Services(service.Namespace).Update(ctx, service, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to update service with load balancer ID: %w", err)
+		}
+	}
+
+	// Fetch the load balancer details
+	loadBalancer, err := l.client.Loadbalancers().Read(lb.ID)
+	if err != nil {
+		return fmt.Errorf("failed to get load balancer: %w", err)
+	}
+
+	// Get cluster ID
+	clusterId, err := GetLabelValue("cluster_id")
+	if err != nil {
+		return fmt.Errorf("failed to get cluster ID: %w", err)
+	}
+
+	// Get node pool IDs
+	nodePoolId, err := GetNodePoolsID()
+	if err != nil {
+		return fmt.Errorf("failed to get node pool IDs: %w", err)
+	}
+
+	// Iterate over each service port to configure frontends and backends
+	for _, port := range service.Spec.Ports {
+		// Ensure the protocol is TCP
+		if port.Protocol != v1.ProtocolTCP {
+			return fmt.Errorf("only TCP protocol is supported, got: %q", port.Protocol)
+		}
+
+		// Check if the port is already configured in a frontend
+		portStr := strconv.Itoa(int(port.Port))
+		exists := false
+		for _, fe := range loadBalancer.Frontends {
+			if fe.Port == portStr {
+				exists = true
+				break
+			}
+		}
+
+		// If frontend doesn't exist, create it
+		if !exists {
+			feRequest := utho.CreateLoadbalancerFrontendParams{
+				LoadbalancerId: lb.ID,
+				Name:           GenerateRandomString(10),
+				Proto:          "tcp",
+				Port:           portStr,
+				Algorithm:      "roundrobin",
+			}
+			klog.Infof("Load balancer frontend request: %+v", feRequest)
+
+			// Create the frontend
+			lbFe, err := l.client.Loadbalancers().CreateFrontend(feRequest)
+			if err != nil {
+				return fmt.Errorf("error creating load balancer frontend: %w", err)
+			}
+
+			// Configure backends for the frontend
+			for _, id := range nodePoolId {
+				feBackend := utho.CreateLoadbalancerBackendParams{
+					LoadbalancerId: lb.ID,
+					FrontendID:     lbFe.ID,
+					Type:           "kubernetes",
+					BackendPort:    strconv.Itoa(int(port.NodePort)),
+					Cloudid:        clusterId,
+					PoolName:       id,
+				}
+				klog.Infof("Load balancer backend request: %+v", feBackend)
+
+				// Create the backend
+				_, err = l.client.Loadbalancers().CreateBackend(feBackend)
+				if err != nil {
+					return fmt.Errorf("error creating load balancer backend: %w", err)
+				}
+			}
+		}
+	}
 
 	return nil
 }
@@ -299,7 +399,7 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 			LoadbalancerId: lb.ID,
 			Name:           GenerateRandomString(10),
 			Proto:          "tcp",
-			Port:           string(port.Port),
+			Port:           strconv.Itoa(int(port.Port)),
 			Algorithm:      "roundrobin",
 		}
 		klog.Infof("Load balancer frontend request: %+v", feRequest)
@@ -316,7 +416,7 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 				LoadbalancerId: lb.ID,
 				FrontendID:     lbFe.ID,
 				Type:           "kubernetes",
-				BackendPort:    string(port.NodePort),
+				BackendPort:    strconv.Itoa(int(port.NodePort)),
 				Cloudid:        clusterId,
 				PoolName:       id,
 			}

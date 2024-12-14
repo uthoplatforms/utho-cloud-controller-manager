@@ -171,16 +171,16 @@ func (i *instancesv2) getInstanceById(node *v1.Node, clusterId string) (*utho.Wo
 // getInstanceIDFromProviderID extracts a k8s node ID from the provider ID.
 func getInstanceIDFromProviderID(node *v1.Node) (string, error) {
 	if node.Spec.ProviderID == "" {
-		node_id, exists := node.Labels["node_id"]
+		nodeID, exists := node.Labels["node_id"]
 		if !exists {
 			return "", fmt.Errorf("setProviderID: label %s not found on node %s", "node_id", node.Name)
 		}
 
-		if node_id == "" {
+		if nodeID == "" {
 			return "", fmt.Errorf("setProviderID: label %s is empty on node %s", "node_id", node.Name)
 		}
 
-		node.Spec.ProviderID = "utho://" + node_id
+		node.Spec.ProviderID = "utho://" + nodeID
 	}
 
 	split := strings.Split(node.Spec.ProviderID, "://")

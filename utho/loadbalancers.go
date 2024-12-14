@@ -74,7 +74,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		}
 
 		// get vpc id
-		vpcId, err := GetLabelValue("vpc_id")
+		vpcId, err := GetLabelValue("cluster_vpc")
 		if err != nil {
 			return nil, fmt.Errorf("failed to get vpc ID: %w", err)
 		}

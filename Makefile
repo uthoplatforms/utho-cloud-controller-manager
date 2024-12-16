@@ -14,7 +14,7 @@ new-deploy: deploy
 	@kubectl apply -f docs/releases/latest.yml
 
 .PHONY: deploy
-deploy: tidy build
+deploy: tidy build push
 
 .PHONY: build
 build: tidy

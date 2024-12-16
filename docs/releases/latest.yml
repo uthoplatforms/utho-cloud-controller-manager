@@ -24,7 +24,7 @@ rules:
     resources:
       - nodes
     verbs:
-      - '*'
+      - "*"
   - apiGroups:
       - ""
     resources:
@@ -85,6 +85,7 @@ rules:
       - list
       - watch
       - update
+      - delete
   - apiGroups:
       - ""
     resources:
@@ -140,14 +141,12 @@ spec:
           effect: NoSchedule
       hostNetwork: true
       containers:
-        - image: vultr/vultr-cloud-controller-manager:v0.13.3
+        - image: utho/utho-cloud-controller-manager:0.1.0
           imagePullPolicy: Always
           name: utho-cloud-controller-manager
           command:
-            - "/utho-cloud-controller-manager"
+            - "utho-cloud-controller-manager"
             - "--cloud-provider=utho"
-            - "--allow-untagged-cloud=true"
-            - "--authentication-skip-lookup=true"
             - "--v=3"
           env:
             - name: UTHO_API_KEY

@@ -199,12 +199,6 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		}
 	}
 
-	// Fetch the load balancer details
-	loadBalancer, err := l.client.Loadbalancers().Read(lb.ID)
-	if err != nil {
-		return fmt.Errorf("failed to get load balancer: %w", err)
-	}
-
 	// Get cluster ID
 	clusterId, err := GetLabelValue("cluster_id")
 	if err != nil {
@@ -217,60 +211,74 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		return fmt.Errorf("failed to get node pool IDs: %w", err)
 	}
 
-	// Iterate over each service port to configure frontends and backends
+	// Map of desired ports
+	desiredPorts := map[string]*v1.ServicePort{}
 	for _, port := range service.Spec.Ports {
-		// Ensure the protocol is TCP
-		if port.Protocol != v1.ProtocolTCP {
-			return fmt.Errorf("only TCP protocol is supported, got: %q", port.Protocol)
+		if port.Protocol == v1.ProtocolTCP {
+			portStr := strconv.Itoa(int(port.Port))
+			desiredPorts[portStr] = &port
+		} else {
+			klog.Warningf("Skipping unsupported protocol for port %d: %s", port.Port, port.Protocol)
+		}
+	}
+
+	// Fetch existing frontends
+	currentFrontends := make(map[string]utho.Frontends)
+	for _, fe := range lb.Frontends {
+		currentFrontends[fe.Port] = fe
+	}
+
+	// Create or update frontends/backends for desired ports
+	for portStr, port := range desiredPorts {
+		if _, exists := currentFrontends[portStr]; exists {
+			klog.Infof("Frontend already exists for port %s, skipping creation.", portStr)
+			continue
 		}
 
-		// Check if the port is already configured in a frontend
-		portStr := strconv.Itoa(int(port.Port))
-		exists := false
-		for _, fe := range loadBalancer.Frontends {
-			if fe.Port == portStr {
-				exists = true
-				break
-			}
+		// Create new frontend
+		feRequest := utho.CreateLoadbalancerFrontendParams{
+			LoadbalancerId: lb.ID,
+			Name:           GenerateRandomString(10),
+			Proto:          "tcp",
+			Port:           portStr,
+			Algorithm:      "roundrobin",
+			Cookie:         "0",
+		}
+		klog.Infof("Creating new load balancer frontend: %+v", feRequest)
+		lbFe, err := l.client.Loadbalancers().CreateFrontend(feRequest)
+		if err != nil {
+			return fmt.Errorf("error creating load balancer frontend: %w", err)
 		}
 
-		// If frontend doesn't exist, create it
-		if !exists {
-			feRequest := utho.CreateLoadbalancerFrontendParams{
+		// Create backends for the new frontend
+		for _, id := range nodePoolId {
+			feBackend := utho.CreateLoadbalancerBackendParams{
 				LoadbalancerId: lb.ID,
-				Name:           GenerateRandomString(10),
-				Proto:          "tcp",
-				Port:           portStr,
-				Algorithm:      "roundrobin",
+				FrontendID:     lbFe.ID,
+				Type:           "kubernetes",
+				BackendPort:    strconv.Itoa(int(port.NodePort)),
+				Cloudid:        clusterId,
+				PoolName:       id,
 			}
-			klog.Infof("Load balancer frontend request: %+v", feRequest)
-
-			// Create the frontend
-			lbFe, err := l.client.Loadbalancers().CreateFrontend(feRequest)
+			klog.Infof("Creating new load balancer backend: %+v", feBackend)
+			_, err = l.client.Loadbalancers().CreateBackend(feBackend)
 			if err != nil {
-				return fmt.Errorf("error creating load balancer frontend: %w", err)
-			}
-
-			// Configure backends for the frontend
-			for _, id := range nodePoolId {
-				feBackend := utho.CreateLoadbalancerBackendParams{
-					LoadbalancerId: lb.ID,
-					FrontendID:     lbFe.ID,
-					Type:           "kubernetes",
-					BackendPort:    strconv.Itoa(int(port.NodePort)),
-					Cloudid:        clusterId,
-					PoolName:       id,
-				}
-				klog.Infof("Load balancer backend request: %+v", feBackend)
-
-				// Create the backend
-				_, err = l.client.Loadbalancers().CreateBackend(feBackend)
-				if err != nil {
-					return fmt.Errorf("error creating load balancer backend: %w", err)
-				}
+				return fmt.Errorf("error creating load balancer backend: %w", err)
 			}
 		}
 	}
+
+	// Remove frontends for ports no longer desired
+	for portStr, fe := range currentFrontends {
+		if _, exists := desiredPorts[portStr]; !exists {
+			klog.Infof("Deleting unused frontend for port %s", portStr)
+			_, err := l.client.Loadbalancers().DeleteFrontend(lb.ID, fe.ID)
+			if err != nil {
+				return fmt.Errorf("error deleting load balancer frontend: %w", err)
+			}
+		}
+	}
+	klog.Infof("Finish updateing Load balancer for cluster %q, LB ID %q", clusterName, lb.ID)
 
 	return nil
 }

@@ -152,5 +152,5 @@ spec:
             - name: UTHO_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: utho-ccm
+                  name: utho-api-key
                   key: api-key

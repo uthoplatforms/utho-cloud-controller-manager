@@ -1,0 +1,22 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Utho cloud controller",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            "program": "${workspaceFolder}/main.go",
+            "env": {
+                "UTHO_API_KEY": "<API_KEY>"
+            },
+            "args": [
+                "--leader-elect=false",
+                "--v=5",
+                "--cloud-provider=utho",
+                "--kubeconfig=~/.kube/config"
+            ],
+            "buildFlags": "-gcflags=\"all=-N -l\""
+        }
+    ]
+}

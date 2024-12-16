@@ -1,0 +1,17 @@
+apiVersion: apps.utho.com/v1alpha1
+kind: UthoApplication
+metadata:
+  name: test-app-nlb
+spec:
+  loadBalancer:
+    backendPort: 30080
+    frontend:
+      name: test-fe
+      algorithm: roundrobin
+      protocol: tcp
+      port: 80
+    type: network
+    dcslug: innoida
+    name: test-lb
+
+

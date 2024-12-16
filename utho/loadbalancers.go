@@ -401,17 +401,24 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 		return nil, fmt.Errorf("failed to create lb: %w", err)
 	}
 
+	ready := false
 	// checks the status of a load balancer
-	for i := 0; i < 5; i++ {
+	for i := 0; i < 10; i++ {
 		readLb, err := l.client.Loadbalancers().Read(lb.ID)
+		klog.Infof("Load balancer status request: %+v", readLb)
+		klog.Infof("Load balancer status request: Status=%+v, AppStatus=%+v", readLb.Status, readLb.AppStatus)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read lb: %w", err)
 		}
 		if strings.EqualFold(readLb.AppStatus, string(utho.Installed)) {
+			ready = true
 			break
 		}
 
 		time.Sleep(45 * time.Second)
+	}
+	if !ready {
+		return nil, fmt.Errorf("the lb is not raedy in time please connect Utho support")
 	}
 
 	// Iterate over each service port to configure frontend and backend

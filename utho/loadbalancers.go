@@ -3,6 +3,9 @@ package utho
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
+	"time"
 
 	"github.com/uthoplatforms/utho-go/utho"
 	v1 "k8s.io/api/core/v1"
@@ -379,22 +382,6 @@ func getDefaultLBName(service *v1.Service) string {
 	return cloudprovider.DefaultLoadBalancerName(service)
 }
 
-// buildInstanceList create list of nodes to be attached to a load balancer
-func buildInstanceList(nodes []*v1.Node) ([]string, error) {
-	var list []string
-
-	for _, node := range nodes {
-		instanceID, err := getInstanceIDFromProviderID(node)
-		if err != nil {
-			return nil, fmt.Errorf("error getting the provider ID %s : %s", node.Spec.ProviderID, err)
-		}
-
-		list = append(list, instanceID)
-	}
-
-	return list, nil
-}
-
 // CreateUthoLoadBalancer sets up a load balancer, its frontend, and backend configurations
 func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1.Service, nodePoolId []string, clusterId string) (*utho.CreateLoadbalancerResponse, error) {
 	// Create load balancer request parameters
@@ -414,6 +401,19 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 		return nil, fmt.Errorf("failed to create lb: %w", err)
 	}
 
+	// checks the status of a load balancer
+	for i := 0; i < 5; i++ {
+		readLb, err := l.client.Loadbalancers().Read(lb.ID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read lb: %w", err)
+		}
+		if strings.EqualFold(readLb.AppStatus, string(utho.Installed)) {
+			break
+		}
+
+		time.Sleep(45 * time.Second)
+	}
+
 	// Iterate over each service port to configure frontend and backend
 	for _, port := range service.Spec.Ports {
 		// Ensure the protocol is TCP
@@ -428,6 +428,7 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 			Proto:          "tcp",
 			Port:           strconv.Itoa(int(port.Port)),
 			Algorithm:      "roundrobin",
+			Cookie:         "0",
 		}
 		klog.Infof("Load balancer frontend request: %+v", feRequest)
 

@@ -276,6 +276,25 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 }
 
 func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
+	_, exists, err := l.GetLoadBalancer(ctx, clusterName, service)
+	if err != nil {
+		return err
+	}
+	// This is the same as if we were to check if err == errLbNotFound {
+	if !exists {
+		return nil
+	}
+
+	lb, err := l.getUthoLB(ctx, service)
+	if err != nil {
+		return err
+	}
+
+	_, err = l.client.Loadbalancers().Delete(lb.ID)
+	if err != nil {
+		return err
+	}
+	klog.Infof("Finish deleting Load balancer for cluster %q, LB ID %q", clusterName, lb.ID)
 
 	return nil
 }

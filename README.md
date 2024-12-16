@@ -1,4 +1,3 @@
-![Unit Tests](https://github.com/utho/utho-cloud-controller-manager/workflows/Unit%20Tests/badge.svg)
 # Kubernetes Cloud Controller Manager for Utho
 
 The Utho Cloud Controller Manager (ccm) provides a fully supported experience of Utho features in your Kubernetes cluster.

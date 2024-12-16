@@ -1,4 +1,4 @@
-module github.com/utho/utho-cloud-controller-manager
+module github.com/uthoplatforms/utho-cloud-controller-manager
 
 go 1.23
 

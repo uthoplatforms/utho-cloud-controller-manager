@@ -9,7 +9,7 @@ import (
 	"k8s.io/cloud-provider/names"
 
 	"github.com/spf13/pflag"
-	"github.com/utho/utho-cloud-controller-manager/utho"
+	"github.com/uthoplatforms/utho-cloud-controller-manager/utho"
 	"k8s.io/apimachinery/pkg/util/wait"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/cloud-provider/app"

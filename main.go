@@ -2,7 +2,6 @@
 package main
 
 import (
-	"context"
 	goflag "flag"
 	"math/rand"
 	"time"
@@ -50,8 +49,8 @@ func main() {
 
 	defer logs.FlushLogs()
 
-	utho.SetupSecretWatcher(context.Background())
-	go utho.SecretWatcher.WatchSecrets()
+	// utho.SetupSecretWatcher(context.Background())
+	// go utho.SecretWatcher.WatchSecrets()
 
 	if err := command.Execute(); err != nil {
 		klog.Fatal(err)

@@ -6,27 +6,27 @@ tidy:
 	go mod tidy
 	go fmt ./...
 
+# make new-deploy VERSION=0.1.16
+.PHONY: new-deploy
+new-deploy: 
+	@sed -i 's|\(utho/utho-cloud-controller-manager:\)[0-9]*\.[0-9]*\.[0-9]*|\1$(VERSION)|g' docs/releases/latest.yml
+	@kubectl apply -f docs/releases/secret.yml
+	@kubectl apply -f docs/releases/latest.yml
+
 .PHONY: deploy
 deploy: clean docker-build docker-push
 
 .PHONY: build
 build: tidy
-	@echo "building utho ccm"
-	go build -trimpath -o utho-cloud-controller-manager .
-
-.PHONY: build-linux
-build-linux:
-	@echo "building utho ccm for linux"
-	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -o dist/utho-cloud-controller-manager .
-
-.PHONY: docker-build
-docker-build:
-	@echo "building docker image to dockerhub $(REGISTRY) with version $(VERSION)"
-	docker build . -t $(REGISTRY)/utho-cloud-controller-manager:$(VERSION)
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o utho-cloud-controller-manager .
+	@echo "building docker image to dockerhub utho with version $(VERSION)"
+	@docker build . -t utho/utho-cloud-controller-manager:$(VERSION)
 
 .PHONY: docker-push
-docker-push:
-	docker push $(REGISTRY)/utho-cloud-controller-manager:$(VERSION)
+push: build
+	@echo "building docker image to dockerhub utho with version $(VERSION)"
+	docker build . -t utho/utho-cloud-controller-manager:$(VERSION)
+	docker push utho/utho-cloud-controller-manager:$(VERSION)
 
 .PHONY: clean
 clean: tidy

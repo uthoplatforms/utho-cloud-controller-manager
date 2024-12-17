@@ -14,16 +14,15 @@ new-deploy: deploy
 	@kubectl apply -f docs/releases/latest.yml
 
 .PHONY: deploy
-deploy: tidy build
+deploy: tidy build push
 
 .PHONY: build
-build: tidy
+build:
 	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)" -o utho-cloud-controller-manager .
 	@echo "building docker image to dockerhub utho with version $(VERSION)"
 	@docker build . -t utho/utho-cloud-controller-manager:$(VERSION)
 
 .PHONY: docker-push
-push: build
+push:
 	@echo "building docker image to dockerhub utho with version $(VERSION)"
-	docker build . -t utho/utho-cloud-controller-manager:$(VERSION)
 	docker push utho/utho-cloud-controller-manager:$(VERSION)

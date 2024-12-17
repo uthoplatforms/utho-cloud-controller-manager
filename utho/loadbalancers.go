@@ -68,8 +68,6 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	if !exists {
 		klog.Infof("Load balancer for cluster %q doesn't exist, creating", clusterName)
 
-		lbName := l.GetLoadBalancerName(context.Background(), "", service)
-
 		// get cluster id
 		clusterId, err := GetLabelValue("cluster_id")
 		if err != nil {
@@ -87,6 +85,14 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		if err != nil {
 			return nil, fmt.Errorf("failed to get nodepool ID: %w", err)
 		}
+
+		// lbName := l.GetLoadBalancerName(context.Background(), "", service)
+		k8sCluster, err := l.client.Kubernetes().Read(clusterId)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read utho kubernetes: %w", err)
+		}
+
+		lbName := fmt.Sprintf("%s_%s_%s", service.Name, k8sCluster.Info.Cluster.Label, GenerateRandomString(5))
 
 		lb, err := l.CreateUthoLoadBalancer(lbName, vpcId, service, nodePoolId, clusterId)
 

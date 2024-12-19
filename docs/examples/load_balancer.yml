@@ -4,7 +4,7 @@ metadata:
   name: test
   annotations:
     # name of the loadbalancer
-    service.beta.kubernetes.io/utho-loadbalancer-label: "k8s-lb-custom-name"
+    service.beta.kubernetes.io/utho-loadbalancer-name: "k8s-lb-custom-name"
 spec:
   type: LoadBalancer
   selector:

@@ -145,7 +145,7 @@ func (i *instancesv2) nodeInstanceAddresses(instance *utho.WorkerNode) ([]v1.Nod
 
 	addresses = append(addresses,
 		v1.NodeAddress{Type: v1.NodeInternalIP, Address: instance.Ip},
-		v1.NodeAddress{Type: v1.NodeExternalIP, Address: instance.PrivateNetwork.Ip},
+		// v1.NodeAddress{Type: v1.NodeExternalIP, Address: instance.PrivateNetwork.Ip},
 	)
 
 	return addresses, nil

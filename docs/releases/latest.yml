@@ -141,7 +141,7 @@ spec:
           effect: NoSchedule
       hostNetwork: true
       containers:
-        - image: utho/utho-cloud-controller-manager:0.1.8
+        - image: utho/utho-cloud-controller-manager:0.1.9
           imagePullPolicy: Always
           name: utho-cloud-controller-manager
           command:

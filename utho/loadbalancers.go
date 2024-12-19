@@ -407,6 +407,8 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 		if err != nil {
 			return nil, fmt.Errorf("failed to read lb: %w", err)
 		}
+		klog.Infof("Load balancer check app status request: %+v", readLb)
+		klog.Infof("Load balancer app status: %s", readLb.AppStatus)
 		if strings.EqualFold(readLb.AppStatus, string(utho.Installed)) {
 			break
 		}

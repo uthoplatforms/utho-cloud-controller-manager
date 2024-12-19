@@ -18,7 +18,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: test
-  annotations:
+  labels:
     app: test
 spec:
   replicas: 2

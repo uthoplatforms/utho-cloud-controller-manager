@@ -2,6 +2,9 @@ apiVersion: v1
 kind: Service
 metadata:
   name: test
+  annotations:
+    # name of the loadbalancer
+    service.beta.kubernetes.io/utho-loadbalancer-label: "k8s-lb-custom-name"
 spec:
   type: LoadBalancer
   selector:
@@ -10,9 +13,6 @@ spec:
     - name: http
       port: 80
       targetPort: 80
-    - name: http2
-      port: 8080
-      targetPort: 8080
 ---
 apiVersion: apps/v1
 kind: Deployment

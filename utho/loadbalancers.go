@@ -52,7 +52,7 @@ func (l *loadbalancers) GetLoadBalancer(ctx context.Context, _ string, service *
 
 // GetLoadBalancerName returns the LoadBalancer name from annotations or defaults to a generated name.
 func (l *loadbalancers) GetLoadBalancerName(_ context.Context, _ string, service *v1.Service) string {
-	if label, ok := service.Annotations[annoUthoLoadBalancerLabel]; ok {
+	if label, ok := service.Annotations[annoUthoLoadBalancerName]; ok {
 		return label
 	}
 	return getDefaultLBName(service)
@@ -86,13 +86,7 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 			return nil, fmt.Errorf("failed to get nodepool ID: %w", err)
 		}
 
-		// lbName := l.GetLoadBalancerName(context.Background(), "", service)
-		k8sCluster, err := l.client.Kubernetes().Read(clusterId)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read utho kubernetes: %w", err)
-		}
-
-		lbName := fmt.Sprintf("%s_%s_%s", service.Name, k8sCluster.Info.Cluster.Label, GenerateRandomString(5))
+		lbName := l.GetLoadBalancerName(context.Background(), "", service)
 
 		lb, err := l.CreateUthoLoadBalancer(lbName, vpcId, service, nodePoolId, clusterId)
 

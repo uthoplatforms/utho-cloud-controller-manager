@@ -345,12 +345,22 @@ func (l *loadbalancers) GetKubeClient() error {
 
 // lbByName retrieves a load balancer by name and matches it with the cluster ID.
 func (l *loadbalancers) lbByName(lbName string) (*utho.Loadbalancer, error) {
+	if err := l.GetKubeClient(); err != nil {
+		return nil, fmt.Errorf("lbByName: failed to get kubeclient to update service: %w", err)
+	}
+
+	// Get cluster ID
+	clusterId, err := GetLabelValue("cluster_id", l.kubeClient)
+	if err != nil {
+		return nil, fmt.Errorf("lbByName: failed to get cluster ID: %w", err)
+	}
+
 	lbs, err := l.client.Loadbalancers().List()
 	if err != nil {
 		return nil, fmt.Errorf("lbByName: failed to list load balancers: %w", err)
 	}
 	for _, lb := range lbs {
-		if lb.Name == lbName {
+		if strings.EqualFold(lb.Name, lbName) && strings.EqualFold(lb.ClusterID, clusterId) {
 			return &lb, nil
 		}
 	}

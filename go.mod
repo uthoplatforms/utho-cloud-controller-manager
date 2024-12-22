@@ -4,7 +4,7 @@ go 1.23
 
 require (
 	github.com/spf13/pflag v1.0.5
-	github.com/uthoplatforms/utho-go v0.1.34
+	github.com/uthoplatforms/utho-go v0.1.36
 	golang.org/x/exp v0.0.0-20240909161429-701f63a606c0
 	k8s.io/api v0.31.1
 	k8s.io/apimachinery v0.31.1

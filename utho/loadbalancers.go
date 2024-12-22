@@ -148,12 +148,13 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1.Service, nodePoolId []string, clusterId string) (*utho.CreateLoadbalancerResponse, error) {
 	// Create LoadBalancer request parameters
 	lbRequest := utho.CreateLoadbalancerParams{
-		Name:           lbName,
-		Dcslug:         l.zone,
-		Vpc:            vpcId,
-		Type:           "network",
-		EnablePublicip: "true",
-		Cpumodel:       "amd",
+		Name:                lbName,
+		Dcslug:              l.zone,
+		Vpc:                 vpcId,
+		Type:                "network",
+		EnablePublicip:      "true",
+		Cpumodel:            "amd",
+		KubernetesClusterid: clusterId,
 	}
 	klog.Infof("CreateUthoLoadBalancer: LoadBalancer request: %+v", lbRequest)
 
@@ -477,13 +478,13 @@ func (l *loadbalancers) GetLoadBalancerName(_ context.Context, _ string, service
 }
 
 // lbByName retrieves a load balancer by name and matches it with the cluster ID.
-func (l *loadbalancers) lbByName(lbName string) (*utho.Loadbalancer, error) {
+func (l *loadbalancers) lbByName(lbName, clusterId string) (*utho.Loadbalancer, error) {
 	lbs, err := l.client.Loadbalancers().List()
 	if err != nil {
 		return nil, err
 	}
 	for _, lb := range lbs {
-		if lb.Name == lbName {
+		if lb.Name == lbName && strings.EqualFold(lb.KubernetesClusterid, clusterId) {
 			return &lb, nil
 		}
 	}
@@ -502,12 +503,20 @@ func (l *loadbalancers) getUthoLB(ctx context.Context, service *v1.Service) (*ut
 		return lb, nil
 	}
 
+	if err := l.GetKubeClient(); err != nil {
+		return nil, fmt.Errorf("UpdateLoadBalancer: failed to get kubeclient: %w", err)
+	}
+	clusterId, err := GetLabelValue("cluster_id", l.kubeClient)
+	if err != nil {
+		return nil, fmt.Errorf("UpdateLoadBalancer: failed to get cluster ID: %w", err)
+	}
+
 	// Otherwise, attempt to retrieve the LoadBalancer by its default or annotated name
 	defaultLBName := getDefaultLBName(service)
-	if lb, err := l.lbByName(defaultLBName); err != nil {
+	if lb, err := l.lbByName(defaultLBName, clusterId); err != nil {
 		// If not found, attempt to retrieve by explicitly specified LoadBalancer name
 		lbName := l.GetLoadBalancerName(ctx, "", service)
-		lb, err = l.lbByName(lbName)
+		lb, err = l.lbByName(lbName, clusterId)
 		if err != nil {
 			return nil, err
 		}

@@ -373,7 +373,7 @@ func (l *loadbalancers) GetLoadBalancerName(_ context.Context, _ string, service
 func (l *loadbalancers) lbByName(lbName string) (*utho.Loadbalancer, error) {
 	lbs, err := l.client.Loadbalancers().List()
 	if err != nil {
-		return nil, fmt.Errorf("lbByName: failed to list load balancers: %w", err)
+		return nil, err
 	}
 	for _, lb := range lbs {
 		if lb.Name == lbName {
@@ -381,7 +381,7 @@ func (l *loadbalancers) lbByName(lbName string) (*utho.Loadbalancer, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("lbByName: %w", errLbNotFound)
+	return nil, errLbNotFound
 }
 
 // getUthoLB retrieves a Utho LoadBalancer associated with a service, either by ID or by name.
@@ -390,7 +390,7 @@ func (l *loadbalancers) getUthoLB(ctx context.Context, service *v1.Service) (*ut
 	if id, ok := service.Annotations[annoUthoLoadBalancerID]; ok {
 		lb, err := l.client.Loadbalancers().Read(id)
 		if err != nil {
-			return nil, fmt.Errorf("getUthoLB: failed to read LoadBalancer by ID: %w", err)
+			return nil, err
 		}
 		return lb, nil
 	}
@@ -402,7 +402,7 @@ func (l *loadbalancers) getUthoLB(ctx context.Context, service *v1.Service) (*ut
 		lbName := l.GetLoadBalancerName(ctx, "", service)
 		lb, err = l.lbByName(lbName)
 		if err != nil {
-			return nil, fmt.Errorf("getUthoLB: failed to find LoadBalancer by name: %w", err)
+			return nil, err
 		}
 		return lb, nil
 	} else {

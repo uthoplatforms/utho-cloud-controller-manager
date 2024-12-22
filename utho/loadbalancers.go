@@ -144,6 +144,113 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 	return lbStatus, nil
 }
 
+// CreateUthoLoadBalancer sets up a LoadBalancer, its frontend, and backend configurations.
+func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1.Service, nodePoolId []string, clusterId string) (*utho.CreateLoadbalancerResponse, error) {
+	// Create LoadBalancer request parameters
+	lbRequest := utho.CreateLoadbalancerParams{
+		Name:           lbName,
+		Dcslug:         l.zone,
+		Vpc:            vpcId,
+		Type:           "network",
+		EnablePublicip: "true",
+		Cpumodel:       "amd",
+	}
+	klog.Infof("CreateUthoLoadBalancer: LoadBalancer request: %+v", lbRequest)
+
+	// Create the LoadBalancer
+	lb, err := l.client.Loadbalancers().Create(lbRequest)
+	if err != nil {
+		return nil, fmt.Errorf("CreateUthoLoadBalancer: failed to create LoadBalancer: %w", err)
+	}
+
+	// Check the status of the LoadBalancer
+	for i := 0; i < 5; i++ {
+		readLb, err := l.client.Loadbalancers().Read(lb.ID)
+		if err != nil {
+			return nil, fmt.Errorf("CreateUthoLoadBalancer: failed to read LoadBalancer status: %w", err)
+		}
+		klog.Infof("CreateUthoLoadBalancer: LoadBalancer status app check: %+v", readLb)
+		klog.Infof("CreateUthoLoadBalancer: LoadBalancer app status: %s", readLb.AppStatus)
+		if strings.EqualFold(readLb.AppStatus, string(utho.Installed)) {
+			break
+		}
+		time.Sleep(45 * time.Second)
+	}
+
+	// get services annotion
+	algo := getAlgorithm(service)
+
+	stickeSessionEnabled := getStickySessionEnabled(service)
+
+	sslRedirect := getSSLRedirect(service)
+
+	var lBSSLID string
+	if lBSSLIDVal, ok := service.Annotations[annoUthoLBSSLID]; ok {
+		lBSSLID = lBSSLIDVal
+	}
+
+	// Iterate over each service port to configure frontend and backend
+	for _, port := range service.Spec.Ports {
+		// Ensure the protocol is TCP
+		if port.Protocol != v1.ProtocolTCP {
+			return nil, fmt.Errorf("CreateUthoLoadBalancer: only TCP protocol is supported, got: %q", port.Protocol)
+		}
+
+		isHTTPPort := int(port.Port) == 80 || int(port.Port) == 443
+
+		// Create LoadBalancer frontend request parameters
+		feRequest := utho.CreateLoadbalancerFrontendParams{
+			LoadbalancerId: lb.ID,
+			Name:           GenerateRandomString(10),
+			Proto:          "tcp",
+			Port:           strconv.Itoa(int(port.Port)),
+			Algorithm:      algo,
+			Cookie:         stickeSessionEnabled,
+		}
+
+		// Add `Redirecthttps` and `CertificateID` only for HTTP ports
+		if isHTTPPort {
+			if sslRedirect {
+				feRequest.Redirecthttps = "1"
+			}
+			if lBSSLID != "" {
+				feRequest.CertificateID = lBSSLID
+				feRequest.Proto = "https"
+			}
+		}
+
+		klog.Infof("CreateUthoLoadBalancer: LoadBalancer Frontend request: %+v", feRequest)
+
+		// Create the frontend
+		lbFe, err := l.client.Loadbalancers().CreateFrontend(feRequest)
+		if err != nil {
+			return nil, fmt.Errorf("CreateUthoLoadBalancer: error creating LoadBalancer frontend: %w", err)
+		}
+
+		// Configure backends for each node pool
+		for _, id := range nodePoolId {
+			feBackend := utho.CreateLoadbalancerBackendParams{
+				LoadbalancerId: lb.ID,
+				FrontendID:     lbFe.ID,
+				Type:           "kubernetes",
+				BackendPort:    strconv.Itoa(int(port.NodePort)),
+				Cloudid:        clusterId,
+				PoolName:       id,
+			}
+			klog.Infof("CreateUthoLoadBalancer: LoadBalancer Backend request: %+v", feBackend)
+
+			// Create the backend
+			_, err := l.client.Loadbalancers().CreateBackend(feBackend)
+			if err != nil {
+				return nil, fmt.Errorf("CreateUthoLoadBalancer: error creating backend: %w", err)
+			}
+		}
+	}
+
+	// Return the created LoadBalancer
+	return lb, nil
+}
+
 // UpdateLoadBalancer updates the configuration of the specified Kubernetes LoadBalancer.
 func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
 	klog.V(3).Info("UpdateLoadBalancer: Called UpdateLoadBalancers")
@@ -413,113 +520,6 @@ func (l *loadbalancers) getUthoLB(ctx context.Context, service *v1.Service) (*ut
 // getDefaultLBName generates a default LoadBalancer name for a service.
 func getDefaultLBName(service *v1.Service) string {
 	return cloudprovider.DefaultLoadBalancerName(service)
-}
-
-// CreateUthoLoadBalancer sets up a LoadBalancer, its frontend, and backend configurations.
-func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1.Service, nodePoolId []string, clusterId string) (*utho.CreateLoadbalancerResponse, error) {
-	// Create LoadBalancer request parameters
-	lbRequest := utho.CreateLoadbalancerParams{
-		Name:           lbName,
-		Dcslug:         l.zone,
-		Vpc:            vpcId,
-		Type:           "network",
-		EnablePublicip: "true",
-		Cpumodel:       "amd",
-	}
-	klog.Infof("CreateUthoLoadBalancer: LoadBalancer request: %+v", lbRequest)
-
-	// Create the LoadBalancer
-	lb, err := l.client.Loadbalancers().Create(lbRequest)
-	if err != nil {
-		return nil, fmt.Errorf("CreateUthoLoadBalancer: failed to create LoadBalancer: %w", err)
-	}
-
-	// Check the status of the LoadBalancer
-	for i := 0; i < 5; i++ {
-		readLb, err := l.client.Loadbalancers().Read(lb.ID)
-		if err != nil {
-			return nil, fmt.Errorf("CreateUthoLoadBalancer: failed to read LoadBalancer status: %w", err)
-		}
-		klog.Infof("CreateUthoLoadBalancer: LoadBalancer status app check: %+v", readLb)
-		klog.Infof("CreateUthoLoadBalancer: LoadBalancer app status: %s", readLb.AppStatus)
-		if strings.EqualFold(readLb.AppStatus, string(utho.Installed)) {
-			break
-		}
-		time.Sleep(45 * time.Second)
-	}
-
-	// get services annotion
-	algo := getAlgorithm(service)
-
-	stickeSessionEnabled := getStickySessionEnabled(service)
-
-	sslRedirect := getSSLRedirect(service)
-
-	var lBSSLID string
-	if lBSSLIDVal, ok := service.Annotations[annoUthoLBSSLID]; ok {
-		lBSSLID = lBSSLIDVal
-	}
-
-	// Iterate over each service port to configure frontend and backend
-	for _, port := range service.Spec.Ports {
-		// Ensure the protocol is TCP
-		if port.Protocol != v1.ProtocolTCP {
-			return nil, fmt.Errorf("CreateUthoLoadBalancer: only TCP protocol is supported, got: %q", port.Protocol)
-		}
-
-		isHTTPPort := int(port.Port) == 80 || int(port.Port) == 443
-
-		// Create LoadBalancer frontend request parameters
-		feRequest := utho.CreateLoadbalancerFrontendParams{
-			LoadbalancerId: lb.ID,
-			Name:           GenerateRandomString(10),
-			Proto:          "tcp",
-			Port:           strconv.Itoa(int(port.Port)),
-			Algorithm:      algo,
-			Cookie:         stickeSessionEnabled,
-		}
-
-		// Add `Redirecthttps` and `CertificateID` only for HTTP ports
-		if isHTTPPort {
-			if sslRedirect {
-				feRequest.Redirecthttps = "1"
-			}
-			if lBSSLID != "" {
-				feRequest.CertificateID = lBSSLID
-				feRequest.Proto = "https"
-			}
-		}
-
-		klog.Infof("CreateUthoLoadBalancer: LoadBalancer Frontend request: %+v", feRequest)
-
-		// Create the frontend
-		lbFe, err := l.client.Loadbalancers().CreateFrontend(feRequest)
-		if err != nil {
-			return nil, fmt.Errorf("CreateUthoLoadBalancer: error creating LoadBalancer frontend: %w", err)
-		}
-
-		// Configure backends for each node pool
-		for _, id := range nodePoolId {
-			feBackend := utho.CreateLoadbalancerBackendParams{
-				LoadbalancerId: lb.ID,
-				FrontendID:     lbFe.ID,
-				Type:           "kubernetes",
-				BackendPort:    strconv.Itoa(int(port.NodePort)),
-				Cloudid:        clusterId,
-				PoolName:       id,
-			}
-			klog.Infof("CreateUthoLoadBalancer: LoadBalancer Backend request: %+v", feBackend)
-
-			// Create the backend
-			_, err := l.client.Loadbalancers().CreateBackend(feBackend)
-			if err != nil {
-				return nil, fmt.Errorf("CreateUthoLoadBalancer: error creating backend: %w", err)
-			}
-		}
-	}
-
-	// Return the created LoadBalancer
-	return lb, nil
 }
 
 // getSSLRedirect returns if traffic should be redirected to https

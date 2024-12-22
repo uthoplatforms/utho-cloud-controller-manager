@@ -197,6 +197,18 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		}
 	}
 
+	// get services annotion
+	algo := getAlgorithm(service)
+
+	stickeSessionEnabled := getStickySessionEnabled(service)
+
+	sslRedirect := getSSLRedirect(service)
+
+	var lBSSLID string
+	if lBSSLIDVal, ok := service.Annotations[annoUthoLBSSLID]; ok {
+		lBSSLID = lBSSLIDVal
+	}
+
 	// Fetch existing frontends
 	currentFrontends := make(map[string]utho.Frontends)
 	for _, fe := range lb.Frontends {
@@ -210,15 +222,29 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 			continue
 		}
 
+		isHTTPPort := int(port.Port) == 80 || int(port.Port) == 443
+
 		// Create new frontend
 		feRequest := utho.CreateLoadbalancerFrontendParams{
 			LoadbalancerId: lb.ID,
 			Name:           GenerateRandomString(10),
 			Proto:          "tcp",
 			Port:           portStr,
-			Algorithm:      "roundrobin",
-			Cookie:         "0",
+			Algorithm:      algo,
+			Cookie:         stickeSessionEnabled,
 		}
+
+		// Add `Redirecthttps` and `CertificateID` only for HTTP ports
+		if isHTTPPort {
+			if sslRedirect {
+				feRequest.Redirecthttps = "1"
+			}
+			if lBSSLID != "" {
+				feRequest.CertificateID = lBSSLID
+				feRequest.Proto = "https"
+			}
+		}
+
 		klog.Infof("UpdateLoadBalancer: Creating new load balancer frontend: %+v", feRequest)
 		lbFe, err := l.client.Loadbalancers().CreateFrontend(feRequest)
 		if err != nil {
@@ -422,6 +448,18 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 		time.Sleep(45 * time.Second)
 	}
 
+	// get services annotion
+	algo := getAlgorithm(service)
+
+	stickeSessionEnabled := getStickySessionEnabled(service)
+
+	sslRedirect := getSSLRedirect(service)
+
+	var lBSSLID string
+	if lBSSLIDVal, ok := service.Annotations[annoUthoLBSSLID]; ok {
+		lBSSLID = lBSSLIDVal
+	}
+
 	// Iterate over each service port to configure frontend and backend
 	for _, port := range service.Spec.Ports {
 		// Ensure the protocol is TCP
@@ -429,15 +467,29 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 			return nil, fmt.Errorf("CreateUthoLoadBalancer: only TCP protocol is supported, got: %q", port.Protocol)
 		}
 
+		isHTTPPort := int(port.Port) == 80 || int(port.Port) == 443
+
 		// Create LoadBalancer frontend request parameters
 		feRequest := utho.CreateLoadbalancerFrontendParams{
 			LoadbalancerId: lb.ID,
 			Name:           GenerateRandomString(10),
 			Proto:          "tcp",
 			Port:           strconv.Itoa(int(port.Port)),
-			Algorithm:      "roundrobin",
-			Cookie:         "0",
+			Algorithm:      algo,
+			Cookie:         stickeSessionEnabled,
 		}
+
+		// Add `Redirecthttps` and `CertificateID` only for HTTP ports
+		if isHTTPPort {
+			if sslRedirect {
+				feRequest.Redirecthttps = "1"
+			}
+			if lBSSLID != "" {
+				feRequest.CertificateID = lBSSLID
+				feRequest.Proto = "https"
+			}
+		}
+
 		klog.Infof("CreateUthoLoadBalancer: LoadBalancer Frontend request: %+v", feRequest)
 
 		// Create the frontend
@@ -468,4 +520,48 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 
 	// Return the created LoadBalancer
 	return lb, nil
+}
+
+// getSSLRedirect returns if traffic should be redirected to https
+// default to false if not specified
+func getSSLRedirect(service *v1.Service) bool {
+	redirect, ok := service.Annotations[annoUthoRedirectHTTPToHTTPS]
+	if !ok {
+		return false
+	}
+
+	redirectBool, err := strconv.ParseBool(redirect)
+	if err != nil {
+		return false
+	}
+
+	return redirectBool
+}
+
+// getAlgorithm returns the algorithm to be used for load balancer service
+// defaults to round_robin if no algorithm is provided.
+func getAlgorithm(service *v1.Service) string {
+	algo := service.Annotations[annoUthoAlgorithm]
+	if algo == "leastconn" {
+		return "leastconn"
+	}
+
+	return "roundrobin"
+}
+
+// getStickySessionEnabled returns whether or not sticky sessions should be enabled
+// default is off
+func getStickySessionEnabled(service *v1.Service) string {
+	enabled, ok := service.Annotations[annoUthoStickySessionEnabled]
+	if !ok {
+		return "0"
+	}
+
+	if enabled == "0" {
+		return "0"
+	} else if enabled == "1" {
+		return "1"
+	}
+
+	return "0"
 }

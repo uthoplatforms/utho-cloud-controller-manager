@@ -14,10 +14,14 @@ import (
 )
 
 // GetLabelValue retrieves the value of a specified label from the first node in the cluster
-func GetLabelValue(labelKey string) (string, error) {
-	clientset, err := GetKubeClient()
-	if err != nil {
-		return "", fmt.Errorf("error creating Kubernetes client: %v", err)
+func GetLabelValue(labelKey string, clientset kubernetes.Interface) (string, error) {
+	var err error
+
+	if clientset == nil {
+		clientset, err = GetKubeClient()
+		if err != nil {
+			return "", fmt.Errorf("error creating Kubernetes client: %v", err)
+		}
 	}
 
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})

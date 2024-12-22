@@ -69,13 +69,13 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		klog.Infof("Load balancer for cluster %q doesn't exist, creating", clusterName)
 
 		// get cluster id
-		clusterId, err := GetLabelValue("cluster_id")
+		clusterId, err := GetLabelValue("cluster_id", l.kubeClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get cluster ID: %w", err)
 		}
 
 		// get vpc id
-		vpcId, err := GetLabelValue("cluster_vpc")
+		vpcId, err := GetLabelValue("cluster_vpc", l.kubeClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get vpc ID: %w", err)
 		}
@@ -191,11 +191,11 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	if service.Annotations == nil {
 		service.Annotations = make(map[string]string)
 	}
+	if err := l.GetKubeClient(); err != nil {
+		return fmt.Errorf("failed to get kubeclient to update service: %w", err)
+	}
 	if _, ok := service.Annotations[annoUthoLoadBalancerID]; !ok {
 		service.Annotations[annoUthoLoadBalancerID] = lb.ID
-		if err := l.GetKubeClient(); err != nil {
-			return fmt.Errorf("failed to get kubeclient to update service: %w", err)
-		}
 		_, err = l.kubeClient.CoreV1().Services(service.Namespace).Update(ctx, service, metav1.UpdateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to update service with load balancer ID: %w", err)
@@ -203,7 +203,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	// Get cluster ID
-	clusterId, err := GetLabelValue("cluster_id")
+	clusterId, err := GetLabelValue("cluster_id", l.kubeClient)
 	if err != nil {
 		return fmt.Errorf("failed to get cluster ID: %w", err)
 	}

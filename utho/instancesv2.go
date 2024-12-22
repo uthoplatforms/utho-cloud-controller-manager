@@ -39,7 +39,7 @@ func (i *instancesv2) InstanceExists(ctx context.Context, node *v1.Node) (bool, 
 		return false, fmt.Errorf("failed to get kubeclient to update service: %s", err)
 	}
 	// Retrieve the cluster ID
-	clusterId, err := GetLabelValue("cluster_id")
+	clusterId, err := GetLabelValue("cluster_id", i.kubeClient)
 	if err != nil {
 		return false, fmt.Errorf("InstanceExists: failed to get cluster ID: %w", err)
 	}
@@ -68,8 +68,11 @@ func (i *instancesv2) InstanceExists(ctx context.Context, node *v1.Node) (bool, 
 
 // InstanceShutdown checks whether the instance is running or powered off.
 func (i *instancesv2) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
+	if err := i.GetKubeClient(); err != nil {
+		return false, fmt.Errorf("failed to get kubeclient to update service: %s", err)
+	}
 	// Retrieve the cluster ID
-	clusterId, err := GetLabelValue("cluster_id")
+	clusterId, err := GetLabelValue("cluster_id", nil)
 	if err != nil {
 		return false, fmt.Errorf("InstanceShutdown: failed to get cluster ID: %w", err)
 	}
@@ -91,8 +94,11 @@ func (i *instancesv2) InstanceShutdown(ctx context.Context, node *v1.Node) (bool
 
 // InstanceMetadata returns a struct of type InstanceMetadata containing the node information.
 func (i *instancesv2) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
+	if err := i.GetKubeClient(); err != nil {
+		return nil, fmt.Errorf("failed to get kubeclient to update service: %s", err)
+	}
 	// Retrieve the cluster ID
-	clusterId, err := GetLabelValue("cluster_id")
+	clusterId, err := GetLabelValue("cluster_id", i.kubeClient)
 	if err != nil {
 		return nil, fmt.Errorf("InstanceMetadata: failed to get cluster ID: %w", err)
 	}

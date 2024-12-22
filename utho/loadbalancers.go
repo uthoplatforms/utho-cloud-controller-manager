@@ -180,7 +180,7 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 	// get services annotion
 	algo := getAlgorithm(service)
 
-	stickeSessionEnabled := getStickySessionEnabled(service)
+	stickySessionEnabled := getStickySessionEnabled(service)
 
 	sslRedirect := getSSLRedirect(service)
 
@@ -205,7 +205,7 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 			Proto:          "tcp",
 			Port:           strconv.Itoa(int(port.Port)),
 			Algorithm:      algo,
-			Cookie:         stickeSessionEnabled,
+			Cookie:         stickySessionEnabled,
 		}
 
 		// Add `Redirecthttps` and `CertificateID` only for HTTP ports
@@ -304,10 +304,10 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 		}
 	}
 
-	// get services annotion
+	// Get services annotation
 	algo := getAlgorithm(service)
 
-	stickeSessionEnabled := getStickySessionEnabled(service)
+	stickySessionEnabled := getStickySessionEnabled(service)
 
 	sslRedirect := getSSLRedirect(service)
 
@@ -338,7 +338,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 			Proto:          "tcp",
 			Port:           portStr,
 			Algorithm:      algo,
-			Cookie:         stickeSessionEnabled,
+			Cookie:         stickySessionEnabled,
 		}
 
 		// Add `Redirecthttps` and `CertificateID` only for HTTP ports

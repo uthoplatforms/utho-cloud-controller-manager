@@ -31,33 +31,6 @@ func newLoadbalancers(client utho.Client, zone string) cloudprovider.LoadBalance
 	return &loadbalancers{client: client, zone: zone}
 }
 
-// GetLoadBalancer retrieves the LoadBalancer status, existence, and any errors for a given service.
-func (l *loadbalancers) GetLoadBalancer(ctx context.Context, _ string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
-	lb, err := l.getUthoLB(ctx, service)
-	if err != nil {
-		if err == errLbNotFound {
-			return nil, false, nil
-		}
-		return nil, false, fmt.Errorf("GetLoadBalancer: %w", err)
-	}
-
-	return &v1.LoadBalancerStatus{
-		Ingress: []v1.LoadBalancerIngress{
-			{
-				IP: lb.IP,
-			},
-		},
-	}, true, nil
-}
-
-// GetLoadBalancerName returns the LoadBalancer name from annotations or defaults to a generated name.
-func (l *loadbalancers) GetLoadBalancerName(_ context.Context, _ string, service *v1.Service) string {
-	if label, ok := service.Annotations[annoUthoLoadBalancerName]; ok {
-		return label
-	}
-	return getDefaultLBName(service)
-}
-
 func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	_, exists, err := l.GetLoadBalancer(ctx, clusterName, service)
 	if err != nil {
@@ -341,6 +314,33 @@ func (l *loadbalancers) GetKubeClient() error {
 	}
 
 	return nil
+}
+
+// GetLoadBalancer retrieves the LoadBalancer status, existence, and any errors for a given service.
+func (l *loadbalancers) GetLoadBalancer(ctx context.Context, _ string, service *v1.Service) (status *v1.LoadBalancerStatus, exists bool, err error) {
+	lb, err := l.getUthoLB(ctx, service)
+	if err != nil {
+		if err == errLbNotFound {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("GetLoadBalancer: %w", err)
+	}
+
+	return &v1.LoadBalancerStatus{
+		Ingress: []v1.LoadBalancerIngress{
+			{
+				IP: lb.IP,
+			},
+		},
+	}, true, nil
+}
+
+// GetLoadBalancerName returns the LoadBalancer name from annotations or defaults to a generated name.
+func (l *loadbalancers) GetLoadBalancerName(_ context.Context, _ string, service *v1.Service) string {
+	if label, ok := service.Annotations[annoUthoLoadBalancerName]; ok {
+		return label
+	}
+	return getDefaultLBName(service)
 }
 
 // lbByName retrieves a load balancer by name and matches it with the cluster ID.

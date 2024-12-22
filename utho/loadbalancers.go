@@ -38,7 +38,7 @@ func (l *loadbalancers) GetLoadBalancer(ctx context.Context, _ string, service *
 		if err == errLbNotFound {
 			return nil, false, nil
 		}
-		return nil, false, err
+		return nil, false, fmt.Errorf("GetLoadBalancer: %w", err)
 	}
 
 	return &v1.LoadBalancerStatus{
@@ -61,50 +61,49 @@ func (l *loadbalancers) GetLoadBalancerName(_ context.Context, _ string, service
 func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) (*v1.LoadBalancerStatus, error) {
 	_, exists, err := l.GetLoadBalancer(ctx, clusterName, service)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("EnsureLoadBalancer: %w", err)
 	}
 
-	// if Load balancer doesn't exist
+	// If LoadBalancer doesn't exist
 	if !exists {
-		klog.Infof("Load balancer for cluster %q doesn't exist, creating", clusterName)
+		klog.Infof("EnsureLoadBalancer: Load balancer for cluster %q doesn't exist, creating", clusterName)
 
-		// get cluster id
+		// Get cluster ID
 		clusterId, err := GetLabelValue("cluster_id", l.kubeClient)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get cluster ID: %w", err)
+			return nil, fmt.Errorf("EnsureLoadBalancer: failed to get cluster ID: %w", err)
 		}
 
-		// get vpc id
+		// Get VPC ID
 		vpcId, err := GetLabelValue("cluster_vpc", l.kubeClient)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get vpc ID: %w", err)
+			return nil, fmt.Errorf("EnsureLoadBalancer: failed to get VPC ID: %w", err)
 		}
 
-		// get nodepool id
+		// Get nodepool ID
 		nodePoolId, err := GetNodePoolsID()
 		if err != nil {
-			return nil, fmt.Errorf("failed to get nodepool ID: %w", err)
+			return nil, fmt.Errorf("EnsureLoadBalancer: failed to get nodepool ID: %w", err)
 		}
 
 		lbName := l.GetLoadBalancerName(context.Background(), "", service)
 
 		lb, err := l.CreateUthoLoadBalancer(lbName, vpcId, service, nodePoolId, clusterId)
-
 		if err != nil {
-			return nil, fmt.Errorf("failed to create load-balancer: %s", err)
+			return nil, fmt.Errorf("EnsureLoadBalancer: failed to create load-balancer: %w", err)
 		}
-		klog.Infof("Created load balancer %q", lb.ID)
+		klog.Infof("EnsureLoadBalancer: Created load balancer %q", lb.ID)
 
 		// Set the Utho VLB ID annotation
 		if _, ok := service.Annotations[annoUthoLoadBalancerID]; !ok {
 			if err = l.GetKubeClient(); err != nil {
-				return nil, fmt.Errorf("failed to get kubeclient to update service: %s", err)
+				return nil, fmt.Errorf("EnsureLoadBalancer: failed to get kubeclient to update service: %w", err)
 			}
 
-			// get k8s services
+			// Get Kubernetes services
 			service, err = l.kubeClient.CoreV1().Services(service.Namespace).Get(ctx, service.Name, metav1.GetOptions{})
 			if err != nil {
-				return nil, fmt.Errorf("failed to get service with loadbalancer ID: %s", err)
+				return nil, fmt.Errorf("EnsureLoadBalancer: failed to get service with LoadBalancer ID: %w", err)
 			}
 
 			if service.Annotations == nil {
@@ -114,13 +113,13 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 
 			_, err = l.kubeClient.CoreV1().Services(service.Namespace).Update(ctx, service, metav1.UpdateOptions{})
 			if err != nil {
-				return nil, fmt.Errorf("failed to update service with loadbalancer ID: %s", err)
+				return nil, fmt.Errorf("EnsureLoadBalancer: failed to update service with LoadBalancer ID: %w", err)
 			}
 		}
 
 		getLb, err := l.client.Loadbalancers().Read(lb.ID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get utho lb with loadbalancer ID: %s", err)
+			return nil, fmt.Errorf("EnsureLoadBalancer: failed to get Utho LoadBalancer with ID: %w", err)
 		}
 
 		return &v1.LoadBalancerStatus{
@@ -132,18 +131,18 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		}, nil
 	}
 
-	klog.Infof("Load balancer exists for cluster %q", clusterName)
+	klog.Infof("EnsureLoadBalancer: Load balancer exists for cluster %q", clusterName)
 
 	lb, err := l.getUthoLB(ctx, service)
 	if err != nil {
 		if err == errLbNotFound {
-			return nil, errLbNotFound
+			return nil, fmt.Errorf("EnsureLoadBalancer: %w", errLbNotFound)
 		}
 
-		return nil, err
+		return nil, fmt.Errorf("EnsureLoadBalancer: %w", err)
 	}
 
-	klog.Infof("Found load balancer: %q", lb.Name)
+	klog.Infof("EnsureLoadBalancer: Found load balancer: %q", lb.Name)
 
 	// Set the Utho VLB ID annotation
 	if _, ok := service.Annotations[annoUthoLoadBalancerID]; !ok {
@@ -152,21 +151,21 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		}
 		service.Annotations[annoUthoLoadBalancerID] = lb.ID
 		if err = l.GetKubeClient(); err != nil {
-			return nil, fmt.Errorf("failed to get kubeclient to update service: %s", err)
+			return nil, fmt.Errorf("EnsureLoadBalancer: failed to get kubeclient to update service: %w", err)
 		}
 		_, err = l.kubeClient.CoreV1().Services(service.Namespace).Update(ctx, service, metav1.UpdateOptions{})
 		if err != nil {
-			return nil, fmt.Errorf("failed to update service with loadbalancer ID: %s", err)
+			return nil, fmt.Errorf("EnsureLoadBalancer: failed to update service with LoadBalancer ID: %w", err)
 		}
 	}
 
-	if err2 := l.UpdateLoadBalancer(ctx, clusterName, service, nodes); err2 != nil { //////////////////////!!!!!
-		return nil, err2
+	if err2 := l.UpdateLoadBalancer(ctx, clusterName, service, nodes); err2 != nil {
+		return nil, fmt.Errorf("EnsureLoadBalancer: %w", err2)
 	}
 
 	lbStatus, _, err := l.GetLoadBalancer(ctx, clusterName, service)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("EnsureLoadBalancer: %w", err)
 	}
 
 	return lbStatus, nil
@@ -174,44 +173,44 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 
 // UpdateLoadBalancer updates the configuration of the specified Kubernetes LoadBalancer.
 func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName string, service *v1.Service, nodes []*v1.Node) error {
-	klog.V(3).Info("Called UpdateLoadBalancers")
+	klog.V(3).Info("UpdateLoadBalancer: Called UpdateLoadBalancers")
 
-	// Check if the load balancer already exists
+	// Check if the LoadBalancer already exists
 	if _, _, err := l.GetLoadBalancer(ctx, clusterName, service); err != nil {
-		return err
+		return fmt.Errorf("UpdateLoadBalancer: %w", err)
 	}
 
-	// Retrieve the Utho load balancer
+	// Retrieve the Utho LoadBalancer
 	lb, err := l.getUthoLB(ctx, service)
 	if err != nil {
-		return err
+		return fmt.Errorf("UpdateLoadBalancer: %w", err)
 	}
 
-	// Ensure the Utho load balancer ID annotation is set
+	// Ensure the Utho LoadBalancer ID annotation is set
 	if service.Annotations == nil {
 		service.Annotations = make(map[string]string)
 	}
 	if err := l.GetKubeClient(); err != nil {
-		return fmt.Errorf("failed to get kubeclient to update service: %w", err)
+		return fmt.Errorf("UpdateLoadBalancer: failed to get kubeclient to update service: %w", err)
 	}
 	if _, ok := service.Annotations[annoUthoLoadBalancerID]; !ok {
 		service.Annotations[annoUthoLoadBalancerID] = lb.ID
 		_, err = l.kubeClient.CoreV1().Services(service.Namespace).Update(ctx, service, metav1.UpdateOptions{})
 		if err != nil {
-			return fmt.Errorf("failed to update service with load balancer ID: %w", err)
+			return fmt.Errorf("UpdateLoadBalancer: failed to update service with LoadBalancer ID: %w", err)
 		}
 	}
 
 	// Get cluster ID
 	clusterId, err := GetLabelValue("cluster_id", l.kubeClient)
 	if err != nil {
-		return fmt.Errorf("failed to get cluster ID: %w", err)
+		return fmt.Errorf("UpdateLoadBalancer: failed to get cluster ID: %w", err)
 	}
 
 	// Get node pool IDs
 	nodePoolId, err := GetNodePoolsID()
 	if err != nil {
-		return fmt.Errorf("failed to get node pool IDs: %w", err)
+		return fmt.Errorf("UpdateLoadBalancer: failed to get node pool IDs: %w", err)
 	}
 
 	// Map of desired ports
@@ -221,7 +220,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 			portStr := strconv.Itoa(int(port.Port))
 			desiredPorts[portStr] = &port
 		} else {
-			klog.Warningf("Skipping unsupported protocol for port %d: %s", port.Port, port.Protocol)
+			klog.Warningf("UpdateLoadBalancer: Skipping unsupported protocol for port %d: %s", port.Port, port.Protocol)
 		}
 	}
 
@@ -234,7 +233,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	// Create or update frontends/backends for desired ports
 	for portStr, port := range desiredPorts {
 		if _, exists := currentFrontends[portStr]; exists {
-			klog.Infof("Frontend already exists for port %s, skipping creation.", portStr)
+			klog.Infof("UpdateLoadBalancer: Frontend already exists for port %s, skipping creation.", portStr)
 			continue
 		}
 
@@ -247,10 +246,10 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 			Algorithm:      "roundrobin",
 			Cookie:         "0",
 		}
-		klog.Infof("Creating new load balancer frontend: %+v", feRequest)
+		klog.Infof("UpdateLoadBalancer: Creating new load balancer frontend: %+v", feRequest)
 		lbFe, err := l.client.Loadbalancers().CreateFrontend(feRequest)
 		if err != nil {
-			return fmt.Errorf("error creating load balancer frontend: %w", err)
+			return fmt.Errorf("UpdateLoadBalancer: error creating load balancer frontend: %w", err)
 		}
 
 		// Create backends for the new frontend
@@ -263,10 +262,10 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 				Cloudid:        clusterId,
 				PoolName:       id,
 			}
-			klog.Infof("Creating new load balancer backend: %+v", feBackend)
+			klog.Infof("UpdateLoadBalancer: Creating new load balancer backend: %+v", feBackend)
 			_, err = l.client.Loadbalancers().CreateBackend(feBackend)
 			if err != nil {
-				return fmt.Errorf("error creating load balancer backend: %w", err)
+				return fmt.Errorf("UpdateLoadBalancer: error creating load balancer backend: %w", err)
 			}
 		}
 	}
@@ -274,42 +273,45 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	// Remove frontends for ports no longer desired
 	for portStr, fe := range currentFrontends {
 		if _, exists := desiredPorts[portStr]; !exists {
-			klog.Infof("Deleting unused frontend for port %s", portStr)
+			klog.Infof("UpdateLoadBalancer: Deleting unused frontend for port %s", portStr)
 			_, err := l.client.Loadbalancers().DeleteFrontend(lb.ID, fe.ID)
 			if err != nil {
-				return fmt.Errorf("error deleting load balancer frontend: %w", err)
+				return fmt.Errorf("UpdateLoadBalancer: error deleting load balancer frontend: %w", err)
 			}
 		}
 	}
-	klog.Infof("Finish updateing Load balancer for cluster %q, LB ID %q", clusterName, lb.ID)
+
+	klog.Infof("UpdateLoadBalancer: Finished updating LoadBalancer for cluster %q, LB ID %q", clusterName, lb.ID)
 
 	return nil
 }
 
+// EnsureLoadBalancerDeleted ensures that a LoadBalancer associated with a specific service is deleted.
 func (l *loadbalancers) EnsureLoadBalancerDeleted(ctx context.Context, clusterName string, service *v1.Service) error {
 	_, exists, err := l.GetLoadBalancer(ctx, clusterName, service)
 	if err != nil {
-		return err
+		return fmt.Errorf("EnsureLoadBalancerDeleted: %w", err)
 	}
-	// This is the same as if we were to check if err == errLbNotFound {
+	// This is the same as if we were to check if err == errLbNotFound
 	if !exists {
 		return nil
 	}
 
 	lb, err := l.getUthoLB(ctx, service)
 	if err != nil {
-		return err
+		return fmt.Errorf("EnsureLoadBalancerDeleted: %w", err)
 	}
 
 	_, err = l.client.Loadbalancers().Delete(lb.ID)
 	if err != nil {
-		return err
+		return fmt.Errorf("EnsureLoadBalancerDeleted: failed to delete LoadBalancer: %w", err)
 	}
-	klog.Infof("Finish deleting Load balancer for cluster %q, LB ID %q", clusterName, lb.ID)
+	klog.Infof("EnsureLoadBalancerDeleted: Finished deleting LoadBalancer for cluster %q, LB ID %q", clusterName, lb.ID)
 
 	return nil
 }
 
+// GetKubeClient initializes and retrieves a Kubernetes client if not already available.
 func (l *loadbalancers) GetKubeClient() error {
 	if l.kubeClient != nil {
 		return nil
@@ -321,8 +323,7 @@ func (l *loadbalancers) GetKubeClient() error {
 		config     string
 	)
 
-	// If no kubeconfig was passed in or set then we want to default to an empty string
-	// This will have `clientcmd.BuildConfigFromFlags` default to `restclient.InClusterConfig()` which was existing behavior
+	// Default to an empty string if no kubeconfig is passed or set
 	if Options.KubeconfigFlag == nil || Options.KubeconfigFlag.Value.String() == "" {
 		config = ""
 	} else {
@@ -331,21 +332,22 @@ func (l *loadbalancers) GetKubeClient() error {
 
 	kubeConfig, err = clientcmd.BuildConfigFromFlags("", config)
 	if err != nil {
-		return err
+		return fmt.Errorf("GetKubeClient: error building Kubernetes config: %w", err)
 	}
 
 	l.kubeClient, err = kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("GetKubeClient: error creating Kubernetes client: %w", err)
 	}
 
 	return nil
 }
 
+// lbByName retrieves a load balancer by name and matches it with the cluster ID.
 func (l *loadbalancers) lbByName(lbName string) (*utho.Loadbalancer, error) {
 	lbs, err := l.client.Loadbalancers().List()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("lbByName: failed to list load balancers: %w", err)
 	}
 	for _, lb := range lbs {
 		if lb.Name == lbName {
@@ -353,24 +355,28 @@ func (l *loadbalancers) lbByName(lbName string) (*utho.Loadbalancer, error) {
 		}
 	}
 
-	return nil, errLbNotFound
+	return nil, fmt.Errorf("lbByName: %w", errLbNotFound)
 }
 
+// getUthoLB retrieves a Utho LoadBalancer associated with a service, either by ID or by name.
 func (l *loadbalancers) getUthoLB(ctx context.Context, service *v1.Service) (*utho.Loadbalancer, error) {
+	// If the LoadBalancer ID is available in annotations, use it to fetch the LoadBalancer
 	if id, ok := service.Annotations[annoUthoLoadBalancerID]; ok {
 		lb, err := l.client.Loadbalancers().Read(id)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getUthoLB: failed to read LoadBalancer by ID: %w", err)
 		}
 		return lb, nil
 	}
 
+	// Otherwise, attempt to retrieve the LoadBalancer by its default or annotated name
 	defaultLBName := getDefaultLBName(service)
 	if lb, err := l.lbByName(defaultLBName); err != nil {
+		// If not found, attempt to retrieve by explicitly specified LoadBalancer name
 		lbName := l.GetLoadBalancerName(ctx, "", service)
 		lb, err = l.lbByName(lbName)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("getUthoLB: failed to find LoadBalancer by name: %w", err)
 		}
 		return lb, nil
 	} else {
@@ -378,13 +384,14 @@ func (l *loadbalancers) getUthoLB(ctx context.Context, service *v1.Service) (*ut
 	}
 }
 
+// getDefaultLBName generates a default LoadBalancer name for a service.
 func getDefaultLBName(service *v1.Service) string {
 	return cloudprovider.DefaultLoadBalancerName(service)
 }
 
-// CreateUthoLoadBalancer sets up a load balancer, its frontend, and backend configurations
+// CreateUthoLoadBalancer sets up a LoadBalancer, its frontend, and backend configurations.
 func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1.Service, nodePoolId []string, clusterId string) (*utho.CreateLoadbalancerResponse, error) {
-	// Create load balancer request parameters
+	// Create LoadBalancer request parameters
 	lbRequest := utho.CreateLoadbalancerParams{
 		Name:           lbName,
 		Dcslug:         l.zone,
@@ -393,26 +400,25 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 		EnablePublicip: "true",
 		Cpumodel:       "amd",
 	}
-	klog.Infof("Load balancer request: %+v", lbRequest)
+	klog.Infof("CreateUthoLoadBalancer: LoadBalancer request: %+v", lbRequest)
 
-	// Create the load balancer
+	// Create the LoadBalancer
 	lb, err := l.client.Loadbalancers().Create(lbRequest)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create lb: %w", err)
+		return nil, fmt.Errorf("CreateUthoLoadBalancer: failed to create LoadBalancer: %w", err)
 	}
 
-	// checks the status of a load balancer
+	// Check the status of the LoadBalancer
 	for i := 0; i < 5; i++ {
 		readLb, err := l.client.Loadbalancers().Read(lb.ID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read lb: %w", err)
+			return nil, fmt.Errorf("CreateUthoLoadBalancer: failed to read LoadBalancer status: %w", err)
 		}
-		klog.Infof("Load balancer check app status request: %+v", readLb)
-		klog.Infof("Load balancer app status: %s", readLb.AppStatus)
+		klog.Infof("CreateUthoLoadBalancer: LoadBalancer status app check: %+v", readLb)
+		klog.Infof("CreateUthoLoadBalancer: LoadBalancer app status: %s", readLb.AppStatus)
 		if strings.EqualFold(readLb.AppStatus, string(utho.Installed)) {
 			break
 		}
-
 		time.Sleep(45 * time.Second)
 	}
 
@@ -420,10 +426,10 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 	for _, port := range service.Spec.Ports {
 		// Ensure the protocol is TCP
 		if port.Protocol != v1.ProtocolTCP {
-			return nil, fmt.Errorf("only TCP protocol is supported, got: %q", port.Protocol)
+			return nil, fmt.Errorf("CreateUthoLoadBalancer: only TCP protocol is supported, got: %q", port.Protocol)
 		}
 
-		// Create load balancer frontend request parameters
+		// Create LoadBalancer frontend request parameters
 		feRequest := utho.CreateLoadbalancerFrontendParams{
 			LoadbalancerId: lb.ID,
 			Name:           GenerateRandomString(10),
@@ -432,12 +438,12 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 			Algorithm:      "roundrobin",
 			Cookie:         "0",
 		}
-		klog.Infof("Load balancer frontend request: %+v", feRequest)
+		klog.Infof("CreateUthoLoadBalancer: LoadBalancer Frontend request: %+v", feRequest)
 
-		// Create the load balancer frontend
+		// Create the frontend
 		lbFe, err := l.client.Loadbalancers().CreateFrontend(feRequest)
 		if err != nil {
-			return nil, fmt.Errorf("error creating load balancer frontend: %v", err)
+			return nil, fmt.Errorf("CreateUthoLoadBalancer: error creating LoadBalancer frontend: %w", err)
 		}
 
 		// Configure backends for each node pool
@@ -450,16 +456,16 @@ func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1
 				Cloudid:        clusterId,
 				PoolName:       id,
 			}
-			klog.Infof("Load balancer backend request: %+v", feBackend)
+			klog.Infof("CreateUthoLoadBalancer: LoadBalancer Backend request: %+v", feBackend)
 
-			// Create the load balancer backend
+			// Create the backend
 			_, err := l.client.Loadbalancers().CreateBackend(feBackend)
 			if err != nil {
-				return nil, fmt.Errorf("error creating load balancer backend: %v", err)
+				return nil, fmt.Errorf("CreateUthoLoadBalancer: error creating backend: %w", err)
 			}
 		}
 	}
 
-	// Return the created load balancer
+	// Return the created LoadBalancer
 	return lb, nil
 }

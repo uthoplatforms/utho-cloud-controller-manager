@@ -39,29 +39,28 @@ func init() {
 func newCloud() (cloudprovider.Interface, error) {
 	apiToken := os.Getenv(accessTokenEnv)
 	if apiToken == "" {
-		return nil, fmt.Errorf("%s must be set in the environment (use a k8s secret)", accessTokenEnv)
+		return nil, fmt.Errorf("newCloud: %s must be set in the environment (use a k8s secret)", accessTokenEnv)
 	}
 	debug := os.Getenv("debug")
 
 	utho, err := utho.NewClient(apiToken)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create utho client: %v", err)
+		return nil, fmt.Errorf("newCloud: failed to create utho client: %v", err)
 	}
 
 	var dcslug string
 	if debug != "" {
 		dcslug = "inmumbaizone2"
 	} else {
-		clusterId, err := GetLabelValue("cluster_id")
+		clusterId, err := GetLabelValue("cluster_id", nil)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("newCloud: failed to get cluster ID: %w", err)
 		}
 
 		dcslug, err = GetDcslug(utho, clusterId)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("newCloud: failed to get data center slug: %w", err)
 		}
-
 	}
 
 	return &cloud{

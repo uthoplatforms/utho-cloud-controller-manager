@@ -36,7 +36,7 @@ func newInstancesV2(client utho.Client) cloudprovider.InstancesV2 {
 
 func (i *instancesv2) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
 	if err := i.GetKubeClient(); err != nil {
-		return false, fmt.Errorf("failed to get kubeclient to update service: %s", err)
+		return false, fmt.Errorf("InstanceExists: failed to get kubeclient to update service: %v", err)
 	}
 	// Retrieve the cluster ID
 	clusterId, err := GetLabelValue("cluster_id", i.kubeClient)
@@ -47,7 +47,7 @@ func (i *instancesv2) InstanceExists(ctx context.Context, node *v1.Node) (bool, 
 	// Fetch utho Kubernetes node instance
 	k8sNode, err := i.getInstanceById(node, clusterId)
 	if err != nil {
-		log.Printf("InstanceExists: instance(%s) exists check failed: %v", node.Spec.ProviderID, err) //
+		log.Printf("InstanceExists: instance(%s) exists check failed: %v", node.Spec.ProviderID, err)
 
 		if strings.Contains(err.Error(), "InstanceExists: invalid instance ID") ||
 			strings.Contains(err.Error(), "InstanceExists: instance not found") {
@@ -57,7 +57,7 @@ func (i *instancesv2) InstanceExists(ctx context.Context, node *v1.Node) (bool, 
 		return false, fmt.Errorf("InstanceExists: unexpected error during instance existence check: %w", err)
 	}
 
-	// Check if instance exist
+	// Check if instance exists
 	if k8sNode.Cloudid == "" {
 		log.Printf("InstanceExists: instance(%s) doesn't exist", node.Spec.ProviderID)
 		return false, nil
@@ -69,7 +69,7 @@ func (i *instancesv2) InstanceExists(ctx context.Context, node *v1.Node) (bool, 
 // InstanceShutdown checks whether the instance is running or powered off.
 func (i *instancesv2) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
 	if err := i.GetKubeClient(); err != nil {
-		return false, fmt.Errorf("failed to get kubeclient to update service: %s", err)
+		return false, fmt.Errorf("InstanceShutdown: failed to get kubeclient to update service: %v", err)
 	}
 	// Retrieve the cluster ID
 	clusterId, err := GetLabelValue("cluster_id", nil)
@@ -95,7 +95,7 @@ func (i *instancesv2) InstanceShutdown(ctx context.Context, node *v1.Node) (bool
 // InstanceMetadata returns a struct of type InstanceMetadata containing the node information.
 func (i *instancesv2) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
 	if err := i.GetKubeClient(); err != nil {
-		return nil, fmt.Errorf("failed to get kubeclient to update service: %s", err)
+		return nil, fmt.Errorf("InstanceMetadata: failed to get kubeclient to update service: %v", err)
 	}
 	// Retrieve the cluster ID
 	clusterId, err := GetLabelValue("cluster_id", i.kubeClient)
@@ -108,10 +108,7 @@ func (i *instancesv2) InstanceMetadata(ctx context.Context, node *v1.Node) (*clo
 	if err != nil {
 		return nil, fmt.Errorf("InstanceMetadata: failed to get data center slug: %w", err)
 	}
-	x := node.Spec.ProviderID
-	z := node.ObjectMeta.Name
-	fmt.Println(x)
-	fmt.Println(z)
+
 	// Fetch the instance information
 	k8sNode, err := i.getInstanceById(node, clusterId)
 	if err != nil {
@@ -142,11 +139,11 @@ func (i *instancesv2) InstanceMetadata(ctx context.Context, node *v1.Node) (*clo
 func (i *instancesv2) nodeInstanceAddresses(instance *utho.WorkerNode) ([]v1.NodeAddress, error) {
 	var addresses []v1.NodeAddress
 	if instance == nil {
-		return nil, fmt.Errorf("instance is nil, uninitialized: %v", instance)
+		return nil, fmt.Errorf("nodeInstanceAddresses: instance is nil, uninitialized: %v", instance)
 	}
 
 	if instance.Ip == "" && instance.PrivateNetwork.Ip == "" {
-		return nil, fmt.Errorf("require public or private IP")
+		return nil, fmt.Errorf("nodeInstanceAddresses: require public or private IP")
 	}
 
 	addresses = append(addresses,
@@ -161,14 +158,14 @@ func (i *instancesv2) nodeInstanceAddresses(instance *utho.WorkerNode) ([]v1.Nod
 func (i *instancesv2) getInstanceById(node *v1.Node, clusterId string) (*utho.WorkerNode, error) {
 	id, err := getInstanceIDFromProviderID(node)
 	if err != nil {
-		log.Printf("failed to parse provider ID (%s): %v", node.Spec.ProviderID, err)
-		return nil, fmt.Errorf("failed to parse provider ID: %w", err)
+		log.Printf("getInstanceById: failed to parse provider ID (%s): %v", node.Spec.ProviderID, err)
+		return nil, fmt.Errorf("getInstanceById: failed to parse provider ID: %w", err)
 	}
 
 	newNode, err := GetK8sInstance(i.client, clusterId, id)
 	if err != nil {
-		log.Printf("failed to get instance by ID (%s): %v", id, err)
-		return nil, fmt.Errorf("failed to fetch instance from Utho API: %w", err)
+		log.Printf("getInstanceById: failed to get instance by ID (%s): %v", id, err)
+		return nil, fmt.Errorf("getInstanceById: failed to fetch instance from Utho API: %w", err)
 	}
 
 	return newNode, nil
@@ -179,11 +176,11 @@ func getInstanceIDFromProviderID(node *v1.Node) (string, error) {
 	if node.Spec.ProviderID == "" {
 		nodeID, exists := node.Labels["node_id"]
 		if !exists {
-			return "", fmt.Errorf("setProviderID: label %s not found on node %s", "node_id", node.Name)
+			return "", fmt.Errorf("getInstanceIDFromProviderID: label node_id not found on node %s", node.Name)
 		}
 
 		if nodeID == "" {
-			return "", fmt.Errorf("setProviderID: label %s is empty on node %s", "node_id", node.Name)
+			return "", fmt.Errorf("getInstanceIDFromProviderID: label node_id is empty on node %s", node.Name)
 		}
 
 		node.Spec.ProviderID = "utho://" + nodeID
@@ -206,16 +203,16 @@ func setProviderID(node *v1.Node, kubeClient kubernetes.Interface) error {
 		return fmt.Errorf("setProviderID: node is nil")
 	}
 
-	node_id, exists := node.Labels["node_id"]
+	nodeID, exists := node.Labels["node_id"]
 	if !exists {
-		return fmt.Errorf("setProviderID: label %s not found on node %s", "node_id", node.Name)
+		return fmt.Errorf("setProviderID: label node_id not found on node %s", node.Name)
 	}
 
-	if node_id == "" {
-		return fmt.Errorf("setProviderID: label %s is empty on node %s", "node_id", node.Name)
+	if nodeID == "" {
+		return fmt.Errorf("setProviderID: label node_id is empty on node %s", node.Name)
 	}
 
-	node.Spec.ProviderID = "utho//" + node_id
+	node.Spec.ProviderID = "utho://" + nodeID
 
 	// Update the node object
 	_, err := kubeClient.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
@@ -223,7 +220,7 @@ func setProviderID(node *v1.Node, kubeClient kubernetes.Interface) error {
 		return fmt.Errorf("setProviderID: failed to update node: %v", err)
 	}
 
-	log.Printf("setProviderID: Successfully set providerID for node %s to utho//%s", node.Name, node_id)
+	log.Printf("setProviderID: successfully set providerID for node %s to utho://%s", node.Name, nodeID)
 	return nil
 }
 
@@ -232,7 +229,7 @@ func setProviderID(node *v1.Node, kubeClient kubernetes.Interface) error {
 func getInstanceByName(client utho.Client, nodeName types.NodeName) (*utho.CloudInstance, error) {
 	list, err := client.CloudInstances().List()
 	if err != nil {
-		return nil, fmt.Errorf("failed to list cloud instances: %w", err)
+		return nil, fmt.Errorf("getInstanceByName: failed to list cloud instances: %w", err)
 	}
 
 	for _, instance := range list {
@@ -241,7 +238,7 @@ func getInstanceByName(client utho.Client, nodeName types.NodeName) (*utho.Cloud
 		}
 	}
 
-	return nil, cloudprovider.InstanceNotFound
+	return nil, fmt.Errorf("getInstanceByName: cloudprovider.InstanceNotFound")
 }
 
 func (l *instancesv2) GetKubeClient() error {
@@ -265,12 +262,12 @@ func (l *instancesv2) GetKubeClient() error {
 
 	kubeConfig, err = clientcmd.BuildConfigFromFlags("", config)
 	if err != nil {
-		return err
+		return fmt.Errorf("GetKubeClient: error building config: %w", err)
 	}
 
 	l.kubeClient, err = kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("GetKubeClient: error creating Kubernetes client: %w", err)
 	}
 
 	return nil

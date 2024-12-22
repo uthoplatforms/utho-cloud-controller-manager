@@ -20,17 +20,17 @@ func GetLabelValue(labelKey string, clientset kubernetes.Interface) (string, err
 	if clientset == nil {
 		clientset, err = GetKubeClient()
 		if err != nil {
-			return "", fmt.Errorf("error creating Kubernetes client: %v", err)
+			return "", fmt.Errorf("GetLabelValue: error creating Kubernetes client: %v", err)
 		}
 	}
 
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return "", fmt.Errorf("error retrieving nodes: %v", err)
+		return "", fmt.Errorf("GetLabelValue: error retrieving nodes: %v", err)
 	}
 
 	if len(nodes.Items) == 0 {
-		return "", fmt.Errorf("no nodes found in the cluster")
+		return "", fmt.Errorf("GetLabelValue: no nodes found in the cluster")
 	}
 
 	firstNode := nodes.Items[0]
@@ -40,23 +40,23 @@ func GetLabelValue(labelKey string, clientset kubernetes.Interface) (string, err
 		return labelValue, nil
 	}
 
-	return "", fmt.Errorf("`%s` label not found on the first node", labelKey)
+	return "", fmt.Errorf("GetLabelValue: `%s` label not found on the first node", labelKey)
 }
 
 // GetNodePoolsID retrieves all unique node pool IDs from the nodes in the cluster
 func GetNodePoolsID() ([]string, error) {
 	clientset, err := GetKubeClient()
 	if err != nil {
-		return nil, fmt.Errorf("error creating Kubernetes client: %v", err)
+		return nil, fmt.Errorf("GetNodePoolsID: error creating Kubernetes client: %v", err)
 	}
 
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving nodes: %v", err)
+		return nil, fmt.Errorf("GetNodePoolsID: error retrieving nodes: %v", err)
 	}
 
 	if len(nodes.Items) == 0 {
-		return nil, fmt.Errorf("no nodes found in the cluster")
+		return nil, fmt.Errorf("GetNodePoolsID: no nodes found in the cluster")
 	}
 
 	nodePoolIDs := make(map[string]struct{})
@@ -79,7 +79,7 @@ func GetNodePoolsID() ([]string, error) {
 func GetDcslug(client utho.Client, clusterId string) (string, error) {
 	cluster, err := client.Kubernetes().Read(clusterId)
 	if err != nil {
-		return "", fmt.Errorf("unable to get kubernetes info: %v", err)
+		return "", fmt.Errorf("GetDcslug: unable to get kubernetes info: %v", err)
 	}
 
 	slug := cluster.Info.Cluster.Dcslug
@@ -103,7 +103,7 @@ func GenerateRandomString(length int) string {
 func GetK8sInstance(client utho.Client, clusterId, instanceId string) (*utho.WorkerNode, error) {
 	cluster, err := client.Kubernetes().Read(clusterId)
 	if err != nil {
-		return nil, fmt.Errorf("unable to get kubernetes info: %v", err)
+		return nil, fmt.Errorf("GetK8sInstance: unable to get kubernetes info: %v", err)
 	}
 
 	for _, nodePool := range cluster.Nodepools {
@@ -134,12 +134,12 @@ func GetKubeClient() (*kubernetes.Clientset, error) {
 
 	kubeConfig, err = clientcmd.BuildConfigFromFlags("", config)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetKubeClient: error building config: %v", err)
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("GetKubeClient: error creating Kubernetes client: %v", err)
 	}
 
 	return kubeClient, nil

@@ -169,7 +169,7 @@ Create the Ingress Resource file:
 nano hello-kubernetes-ingress.yaml
 ```
 
-Add the following configuration:
+Add the following configuration: done't forget to add your domains
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -238,7 +238,7 @@ Create the production ClusterIssuer:
 nano production_issuer.yaml
 ```
 
-Add the following configuration:
+Add the following configuration: done't forget to add your email
 
 ```yaml
 apiVersion: cert-manager.io/v1
@@ -257,7 +257,7 @@ spec:
           class: nginx
 ```
 
-Apply the configuration:
+Apply the configuration: done't forget to add your domains
 
 ```bash
 kubectl apply -f production_issuer.yaml

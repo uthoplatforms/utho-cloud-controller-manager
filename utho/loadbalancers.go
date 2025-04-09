@@ -42,13 +42,13 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 		klog.Infof("EnsureLoadBalancer: Load balancer for cluster %q doesn't exist, creating", clusterName)
 
 		// Get cluster ID
-		clusterId, err := GetLabelValue("cluster_id", l.kubeClient)
+		clusterId, err := GetLabelValue(l.kubeClient, "cluster_id")
 		if err != nil {
 			return nil, fmt.Errorf("EnsureLoadBalancer: failed to get cluster ID: %w", err)
 		}
 
 		// Get VPC ID
-		vpcId, err := GetLabelValue("cluster_vpc", l.kubeClient)
+		vpcId, err := GetLabelValue(l.kubeClient, "cluster_vpc")
 		if err != nil {
 			return nil, fmt.Errorf("EnsureLoadBalancer: failed to get VPC ID: %w", err)
 		}
@@ -283,7 +283,7 @@ func (l *loadbalancers) UpdateLoadBalancer(ctx context.Context, clusterName stri
 	}
 
 	// Get cluster ID
-	clusterId, err := GetLabelValue("cluster_id", l.kubeClient)
+	clusterId, err := GetLabelValue(l.kubeClient, "cluster_id")
 	if err != nil {
 		return fmt.Errorf("UpdateLoadBalancer: failed to get cluster ID: %w", err)
 	}
@@ -506,7 +506,7 @@ func (l *loadbalancers) getUthoLB(ctx context.Context, service *v1.Service) (*ut
 	if err := l.GetKubeClient(); err != nil {
 		return nil, fmt.Errorf("UpdateLoadBalancer: failed to get kubeclient: %w", err)
 	}
-	clusterId, err := GetLabelValue("cluster_id", l.kubeClient)
+	clusterId, err := GetLabelValue(l.kubeClient, "cluster_id")
 	if err != nil {
 		return nil, fmt.Errorf("UpdateLoadBalancer: failed to get cluster ID: %w", err)
 	}

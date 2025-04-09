@@ -52,7 +52,7 @@ func newCloud() (cloudprovider.Interface, error) {
 	if debug != "" {
 		dcslug = "inmumbaizone2"
 	} else {
-		clusterId, err := GetLabelValue("cluster_id", nil)
+		clusterId, err := GetLabelValue(nil, "cluster_id")
 		if err != nil {
 			return nil, fmt.Errorf("newCloud: failed to get cluster ID: %w", err)
 		}

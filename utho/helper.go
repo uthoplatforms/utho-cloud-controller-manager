@@ -14,7 +14,7 @@ import (
 )
 
 // GetLabelValue retrieves the value of a specified label from the first node in the cluster
-func GetLabelValue(labelKey string, clientset kubernetes.Interface) (string, error) {
+func GetLabelValue(clientset kubernetes.Interface, labelKey string) (string, error) {
 	var err error
 
 	if clientset == nil {
@@ -108,7 +108,7 @@ func GetK8sInstance(client utho.Client, clusterId, instanceId string) (*utho.Wor
 
 	for _, nodePool := range cluster.Nodepools {
 		for _, node := range nodePool.Workers {
-			if node.Cloudid == instanceId {
+			if node.ID == instanceId {
 				return &node, nil
 			}
 		}

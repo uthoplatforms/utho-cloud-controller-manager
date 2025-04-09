@@ -39,7 +39,7 @@ func (i *instancesv2) InstanceExists(ctx context.Context, node *v1.Node) (bool, 
 		return false, fmt.Errorf("InstanceExists: failed to get kubeclient to update service: %v", err)
 	}
 	// Retrieve the cluster ID
-	clusterId, err := GetLabelValue("cluster_id", i.kubeClient)
+	clusterId, err := GetLabelValue(i.kubeClient, "cluster_id")
 	if err != nil {
 		return false, fmt.Errorf("InstanceExists: failed to get cluster ID: %w", err)
 	}
@@ -58,7 +58,7 @@ func (i *instancesv2) InstanceExists(ctx context.Context, node *v1.Node) (bool, 
 	}
 
 	// Check if instance exists
-	if k8sNode.Cloudid == "" {
+	if k8sNode.ID == "" {
 		log.Printf("InstanceExists: instance(%s) doesn't exist", node.Spec.ProviderID)
 		return false, nil
 	}
@@ -72,7 +72,7 @@ func (i *instancesv2) InstanceShutdown(ctx context.Context, node *v1.Node) (bool
 		return false, fmt.Errorf("InstanceShutdown: failed to get kubeclient to update service: %v", err)
 	}
 	// Retrieve the cluster ID
-	clusterId, err := GetLabelValue("cluster_id", nil)
+	clusterId, err := GetLabelValue(i.kubeClient, "cluster_id")
 	if err != nil {
 		return false, fmt.Errorf("InstanceShutdown: failed to get cluster ID: %w", err)
 	}
@@ -98,13 +98,13 @@ func (i *instancesv2) InstanceMetadata(ctx context.Context, node *v1.Node) (*clo
 		return nil, fmt.Errorf("InstanceMetadata: failed to get kubeclient to update service: %v", err)
 	}
 	// Retrieve the cluster ID
-	clusterId, err := GetLabelValue("cluster_id", i.kubeClient)
+	clusterId, err := GetLabelValue(i.kubeClient, "cluster_id")
 	if err != nil {
 		return nil, fmt.Errorf("InstanceMetadata: failed to get cluster ID: %w", err)
 	}
 
 	// Retrieve the data center slug
-	slug, err := GetDcslug(i.client, clusterId)
+	slug, err := GetLabelValue(i.kubeClient, "cluster_dcslug")
 	if err != nil {
 		return nil, fmt.Errorf("InstanceMetadata: failed to get data center slug: %w", err)
 	}
@@ -112,7 +112,7 @@ func (i *instancesv2) InstanceMetadata(ctx context.Context, node *v1.Node) (*clo
 	// Fetch the instance information
 	k8sNode, err := i.getInstanceById(node, clusterId)
 	if err != nil {
-		log.Printf("InstanceMetadata: instance(%s) metadata retrieval failed: %v", node.Spec.ProviderID, err) //
+		log.Printf("InstanceMetadata: instance(%s) metadata retrieval failed: %v", node.Spec.ProviderID, err)
 		return nil, fmt.Errorf("InstanceMetadata: failed to get instance by ID: %w", err)
 	}
 
@@ -124,7 +124,7 @@ func (i *instancesv2) InstanceMetadata(ctx context.Context, node *v1.Node) (*clo
 
 	// Construct the InstanceMetadata struct
 	uthoNode := cloudprovider.InstanceMetadata{
-		ProviderID:    node.Spec.ProviderID,
+		ProviderID:    fmt.Sprintf("utho://%s", k8sNode.ID),
 		InstanceType:  k8sNode.Planid,
 		Region:        slug,
 		NodeAddresses: nodeAddress,

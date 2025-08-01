@@ -1,12 +1,14 @@
 package utho
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/spf13/pflag"
 	"github.com/uthoplatforms/utho-go/utho"
+	v1 "k8s.io/api/core/v1"
 	cloudprovider "k8s.io/cloud-provider"
 	"k8s.io/klog/v2"
 )
@@ -110,4 +112,20 @@ func (c *cloud) ProviderName() string {
 func (c *cloud) HasClusterID() bool {
 	klog.V(5).Info("called HasClusterID")
 	return false
+}
+
+func (c *cloud) InitializeNode(ctx context.Context, _ string, node *v1.Node) (*v1.Node, error) {
+	if node.Spec.ProviderID != "" {
+		return node, nil
+	}
+
+	inst := c.instances.(*instancesv2)
+	if err := inst.GetKubeClient(); err != nil {
+		return nil, err
+	}
+
+	if err := setProviderID(node, inst.kubeClient); err != nil {
+		return nil, err
+	}
+	return node, nil
 }

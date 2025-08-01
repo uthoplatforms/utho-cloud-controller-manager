@@ -2,6 +2,7 @@ package utho
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -17,9 +18,10 @@ import (
 )
 
 const (
-	PENDING  = "pending"
-	ACTIVE   = "active"
-	RESIZING = "resizing"
+	PENDING     = "pending"
+	ACTIVE      = "active"
+	RESIZING    = "resizing"
+	nodeIDLabel = "node_id"
 )
 
 var _ cloudprovider.InstancesV2 = &instancesv2{}
@@ -36,33 +38,25 @@ func newInstancesV2(client utho.Client) cloudprovider.InstancesV2 {
 
 func (i *instancesv2) InstanceExists(ctx context.Context, node *v1.Node) (bool, error) {
 	if err := i.GetKubeClient(); err != nil {
-		return false, fmt.Errorf("InstanceExists: failed to get kubeclient to update service: %v", err)
-	}
-	// Retrieve the cluster ID
-	clusterId, err := GetLabelValue(i.kubeClient, "cluster_id")
-	if err != nil {
-		return false, fmt.Errorf("InstanceExists: failed to get cluster ID: %w", err)
+		return false, fmt.Errorf("InstanceExists: failed to init kube client: %w", err)
 	}
 
-	// Fetch utho Kubernetes node instance
-	k8sNode, err := i.getInstanceById(node, clusterId)
+	clusterID, err := GetLabelValue(i.kubeClient, "cluster_id")
 	if err != nil {
-		log.Printf("InstanceExists: instance(%s) exists check failed: %v", node.Spec.ProviderID, err)
+		return false, fmt.Errorf("InstanceExists: failed to read cluster_id: %w", err)
+	}
 
-		if strings.Contains(err.Error(), "InstanceExists: invalid instance ID") ||
-			strings.Contains(err.Error(), "InstanceExists: instance not found") {
+	k8sNode, err := i.getInstanceById(node, clusterID)
+	if err != nil {
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
 			return false, nil
 		}
-
-		return false, fmt.Errorf("InstanceExists: unexpected error during instance existence check: %w", err)
+		return false, fmt.Errorf("InstanceExists: unexpected error: %w", err)
 	}
 
-	// Check if instance exists
-	if k8sNode.ID == "" {
-		log.Printf("InstanceExists: instance(%s) doesn't exist", node.Spec.ProviderID)
+	if k8sNode == nil || k8sNode.ID == "" {
 		return false, nil
 	}
-
 	return true, nil
 }
 
@@ -155,73 +149,54 @@ func (i *instancesv2) nodeInstanceAddresses(instance *utho.WorkerNode) ([]v1.Nod
 }
 
 // getInstanceById attempts to obtain a Utho instance from the Utho API.
-func (i *instancesv2) getInstanceById(node *v1.Node, clusterId string) (*utho.WorkerNode, error) {
+func (i *instancesv2) getInstanceById(node *v1.Node, clusterID string) (*utho.WorkerNode, error) {
 	id, err := getInstanceIDFromProviderID(node)
 	if err != nil {
-		log.Printf("getInstanceById: failed to parse provider ID (%s): %v", node.Spec.ProviderID, err)
-		return nil, fmt.Errorf("getInstanceById: failed to parse provider ID: %w", err)
+		return nil, fmt.Errorf("getInstanceById: %w", err)
 	}
 
-	newNode, err := GetK8sInstance(i.client, clusterId, id)
+	newNode, err := GetK8sInstance(i.client, clusterID, id)
 	if err != nil {
-		log.Printf("getInstanceById: failed to get instance by ID (%s): %v", id, err)
-		return nil, fmt.Errorf("getInstanceById: failed to fetch instance from Utho API: %w", err)
+		if errors.Is(err, cloudprovider.InstanceNotFound) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("getInstanceById: %w", err)
 	}
-
 	return newNode, nil
 }
 
 // getInstanceIDFromProviderID extracts a k8s node ID from the provider ID.
 func getInstanceIDFromProviderID(node *v1.Node) (string, error) {
 	if node.Spec.ProviderID == "" {
-		nodeID, exists := node.Labels["node_id"]
-		if !exists {
-			return "", fmt.Errorf("getInstanceIDFromProviderID: label node_id not found on node %s", node.Name)
+		if nodeID, ok := node.Labels[nodeIDLabel]; ok && nodeID != "" {
+			return nodeID, nil
 		}
-
-		if nodeID == "" {
-			return "", fmt.Errorf("getInstanceIDFromProviderID: label node_id is empty on node %s", node.Name)
-		}
-
-		node.Spec.ProviderID = "utho://" + nodeID
+		return "", fmt.Errorf("providerID empty and %s label not set on node %s", nodeIDLabel, node.Name)
 	}
 
-	split := strings.Split(node.Spec.ProviderID, "://")
-	if len(split) != 2 {
-		return "", fmt.Errorf("getInstanceIDFromProviderID: unexpected providerID format: %s (expected format: utho://abc123)", node.Spec.ProviderID)
+	parts := strings.SplitN(node.Spec.ProviderID, "://", 2)
+	if len(parts) != 2 {
+		return "", fmt.Errorf("unexpected providerID format: %s (expected utho://abc123)", node.Spec.ProviderID)
 	}
-
-	if split[0] != ProviderName {
-		return "", fmt.Errorf("getInstanceIDFromProviderID: unexpected provider scheme: %s (expected: utho)", split[0])
+	if parts[0] != ProviderName {
+		return "", fmt.Errorf("unexpected provider scheme: %s (expected utho)", parts[0])
 	}
-
-	return split[1], nil
+	return parts[1], nil
 }
 
-func setProviderID(node *v1.Node, kubeClient kubernetes.Interface) error {
-	if node == nil {
-		return fmt.Errorf("setProviderID: node is nil")
+func setProviderID(node *v1.Node, c kubernetes.Interface) error {
+	id := node.Labels[nodeIDLabel]
+	if id == "" {
+		return fmt.Errorf("setProviderID: %s label empty on node %s", nodeIDLabel, node.Name)
 	}
 
-	nodeID, exists := node.Labels["node_id"]
-	if !exists {
-		return fmt.Errorf("setProviderID: label node_id not found on node %s", node.Name)
-	}
-
-	if nodeID == "" {
-		return fmt.Errorf("setProviderID: label node_id is empty on node %s", node.Name)
-	}
-
-	node.Spec.ProviderID = "utho://" + nodeID
-
-	// Update the node object
-	_, err := kubeClient.CoreV1().Nodes().Update(context.TODO(), node, metav1.UpdateOptions{})
-	if err != nil {
-		return fmt.Errorf("setProviderID: failed to update node: %v", err)
-	}
-
-	log.Printf("setProviderID: successfully set providerID for node %s to utho://%s", node.Name, nodeID)
-	return nil
+	patch := []byte(fmt.Sprintf(`{"spec":{"providerID":"utho://%s"}}`, id))
+	_, err := c.CoreV1().Nodes().Patch(context.TODO(),
+		node.Name,
+		types.StrategicMergePatchType,
+		patch,
+		metav1.PatchOptions{})
+	return err
 }
 
 // getInstanceByName retrieves a Utho instance for a given NodeName.

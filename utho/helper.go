@@ -11,36 +11,35 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
+	cloudprovider "k8s.io/cloud-provider"
 )
 
-// GetLabelValue retrieves the value of a specified label from the first node in the cluster
+// GetLabelValue fetches `labelKey` from the first node that carries it.
 func GetLabelValue(clientset kubernetes.Interface, labelKey string) (string, error) {
-	var err error
-
 	if clientset == nil {
+		var err error
 		clientset, err = GetKubeClient()
 		if err != nil {
-			return "", fmt.Errorf("GetLabelValue: error creating Kubernetes client: %v", err)
+			return "", fmt.Errorf("GetLabelValue: %w", err)
 		}
 	}
 
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return "", fmt.Errorf("GetLabelValue: error retrieving nodes: %v", err)
+		return "", fmt.Errorf("GetLabelValue: %w", err)
 	}
-
 	if len(nodes.Items) == 0 {
-		return "", fmt.Errorf("GetLabelValue: no nodes found in the cluster")
+		return "", fmt.Errorf("GetLabelValue: cluster has no nodes")
 	}
 
-	firstNode := nodes.Items[0]
-
-	labels := firstNode.GetLabels()
-	if labelValue, exists := labels[labelKey]; exists {
-		return labelValue, nil
+	for _, n := range nodes.Items {
+		if v := n.Labels[labelKey]; v != "" {
+			return v, nil
+		}
 	}
 
-	return "", fmt.Errorf("GetLabelValue: `%s` label not found on the first node", labelKey)
+	return "", fmt.Errorf("GetLabelValue: label %q not found on any of %d nodes",
+		labelKey, len(nodes.Items))
 }
 
 // GetNodePoolsID retrieves all unique node pool IDs from the nodes in the cluster
@@ -100,21 +99,19 @@ func GenerateRandomString(length int) string {
 	return string(result)
 }
 
-func GetK8sInstance(client utho.Client, clusterId, instanceId string) (*utho.WorkerNode, error) {
-	cluster, err := client.Kubernetes().Read(clusterId)
+func GetK8sInstance(client utho.Client, clusterID, instanceID string) (*utho.WorkerNode, error) {
+	cluster, err := client.Kubernetes().Read(clusterID)
 	if err != nil {
-		return nil, fmt.Errorf("GetK8sInstance: unable to get kubernetes info: %v", err)
+		return nil, fmt.Errorf("GetK8sInstance: %w", err)
 	}
-
-	for _, nodePool := range cluster.Nodepools {
-		for _, node := range nodePool.Workers {
-			if node.ID == instanceId {
-				return &node, nil
+	for _, pool := range cluster.Nodepools {
+		for idx := range pool.Workers {
+			if pool.Workers[idx].ID == instanceID {
+				return &pool.Workers[idx], nil
 			}
 		}
 	}
-
-	return nil, fmt.Errorf("GetK8sInstance: unable to get cluster node: ClusterId %s, NodeID %s", clusterId, instanceId)
+	return nil, cloudprovider.InstanceNotFound
 }
 
 func GetKubeClient() (*kubernetes.Clientset, error) {

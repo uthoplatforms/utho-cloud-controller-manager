@@ -46,12 +46,12 @@ func GetLabelValue(clientset kubernetes.Interface, labelKey string) (string, err
 func GetNodePoolsID() ([]string, error) {
 	clientset, err := GetKubeClient()
 	if err != nil {
-		return nil, fmt.Errorf("GetNodePoolsID: error creating Kubernetes client: %v", err)
+		return nil, fmt.Errorf("GetNodePoolsID: error creating Kubernetes client: %w", err)
 	}
 
 	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("GetNodePoolsID: error retrieving nodes: %v", err)
+		return nil, fmt.Errorf("GetNodePoolsID: error retrieving nodes: %w", err)
 	}
 
 	if len(nodes.Items) == 0 {
@@ -78,7 +78,7 @@ func GetNodePoolsID() ([]string, error) {
 func GetDcslug(client utho.Client, clusterId string) (string, error) {
 	cluster, err := client.Kubernetes().Read(clusterId)
 	if err != nil {
-		return "", fmt.Errorf("GetDcslug: unable to get kubernetes info: %v", err)
+		return "", fmt.Errorf("GetDcslug: unable to get kubernetes info: %w", err)
 	}
 
 	slug := cluster.Info.Cluster.Dcslug
@@ -87,13 +87,14 @@ func GetDcslug(client utho.Client, clusterId string) (string, error) {
 }
 
 func GenerateRandomString(length int) string {
-	rand.Seed(uint64(time.Now().UnixNano()))
+	src := rand.NewSource(uint64(time.Now().UnixNano()))
+	rng := rand.New(src)
 
 	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	result := make([]byte, length)
 
 	for i := 0; i < length; i++ {
-		result[i] = chars[rand.Intn(len(chars))]
+		result[i] = chars[rng.Intn(len(chars))]
 	}
 
 	return string(result)
@@ -131,12 +132,12 @@ func GetKubeClient() (*kubernetes.Clientset, error) {
 
 	kubeConfig, err = clientcmd.BuildConfigFromFlags("", config)
 	if err != nil {
-		return nil, fmt.Errorf("GetKubeClient: error building config: %v", err)
+		return nil, fmt.Errorf("GetKubeClient: error building config: %w", err)
 	}
 
 	kubeClient, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		return nil, fmt.Errorf("GetKubeClient: error creating Kubernetes client: %v", err)
+		return nil, fmt.Errorf("GetKubeClient: error creating Kubernetes client: %w", err)
 	}
 
 	return kubeClient, nil

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/uthoplatforms/utho-go/utho"
@@ -15,12 +14,10 @@ import (
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	cloudprovider "k8s.io/cloud-provider"
+	"k8s.io/klog/v2"
 )
 
 const (
-	PENDING     = "pending"
-	ACTIVE      = "active"
-	RESIZING    = "resizing"
 	nodeIDLabel = "node_id"
 )
 
@@ -63,7 +60,7 @@ func (i *instancesv2) InstanceExists(ctx context.Context, node *v1.Node) (bool, 
 // InstanceShutdown checks whether the instance is running or powered off.
 func (i *instancesv2) InstanceShutdown(ctx context.Context, node *v1.Node) (bool, error) {
 	if err := i.GetKubeClient(); err != nil {
-		return false, fmt.Errorf("InstanceShutdown: failed to get kubeclient to update service: %v", err)
+		return false, fmt.Errorf("InstanceShutdown: failed to get kubeclient: %w", err)
 	}
 	// Retrieve the cluster ID
 	clusterId, err := GetLabelValue(i.kubeClient, "cluster_id")
@@ -74,7 +71,7 @@ func (i *instancesv2) InstanceShutdown(ctx context.Context, node *v1.Node) (bool
 	// Fetch the instance information
 	newNode, err := i.getInstanceById(node, clusterId)
 	if err != nil {
-		log.Printf("InstanceShutdown: instance(%s) shutdown check failed: %v", node.Spec.ProviderID, err) //
+		klog.Errorf("InstanceShutdown: instance(%s) shutdown check failed: %v", node.Spec.ProviderID, err)
 		return false, fmt.Errorf("InstanceShutdown: failed to get instance by ID: %w", err)
 	}
 
@@ -89,7 +86,7 @@ func (i *instancesv2) InstanceShutdown(ctx context.Context, node *v1.Node) (bool
 // InstanceMetadata returns a struct of type InstanceMetadata containing the node information.
 func (i *instancesv2) InstanceMetadata(ctx context.Context, node *v1.Node) (*cloudprovider.InstanceMetadata, error) {
 	if err := i.GetKubeClient(); err != nil {
-		return nil, fmt.Errorf("InstanceMetadata: failed to get kubeclient to update service: %v", err)
+		return nil, fmt.Errorf("InstanceMetadata: failed to get kubeclient: %w", err)
 	}
 	// Retrieve the cluster ID
 	clusterId, err := GetLabelValue(i.kubeClient, "cluster_id")
@@ -106,7 +103,7 @@ func (i *instancesv2) InstanceMetadata(ctx context.Context, node *v1.Node) (*clo
 	// Fetch the instance information
 	k8sNode, err := i.getInstanceById(node, clusterId)
 	if err != nil {
-		log.Printf("InstanceMetadata: instance(%s) metadata retrieval failed: %v", node.Spec.ProviderID, err)
+		klog.Errorf("InstanceMetadata: instance(%s) metadata retrieval failed: %v", node.Spec.ProviderID, err)
 		return nil, fmt.Errorf("InstanceMetadata: failed to get instance by ID: %w", err)
 	}
 
@@ -125,7 +122,7 @@ func (i *instancesv2) InstanceMetadata(ctx context.Context, node *v1.Node) (*clo
 	}
 
 	// Log the returned metadata
-	log.Printf("InstanceMetadata: returned node metadata: %v", uthoNode) //
+	klog.V(5).Infof("InstanceMetadata: returned node metadata: %v", uthoNode)
 	return &uthoNode, nil
 }
 
@@ -133,7 +130,7 @@ func (i *instancesv2) InstanceMetadata(ctx context.Context, node *v1.Node) (*clo
 func (i *instancesv2) nodeInstanceAddresses(instance *utho.WorkerNode) ([]v1.NodeAddress, error) {
 	var addresses []v1.NodeAddress
 	if instance == nil {
-		return nil, fmt.Errorf("nodeInstanceAddresses: instance is nil, uninitialized: %v", instance)
+		return nil, fmt.Errorf("nodeInstanceAddresses: instance is nil")
 	}
 
 	if instance.Ip == "" && instance.PrivateNetwork.Ip == "" {

@@ -47,7 +47,7 @@ func newCloud() (cloudprovider.Interface, error) {
 
 	utho, err := utho.NewClient(apiToken)
 	if err != nil {
-		return nil, fmt.Errorf("newCloud: failed to create utho client: %v", err)
+		return nil, fmt.Errorf("newCloud: failed to create utho client: %w", err)
 	}
 
 	var dcslug string

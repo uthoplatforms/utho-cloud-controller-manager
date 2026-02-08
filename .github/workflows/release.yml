@@ -1,0 +1,96 @@
+name: Release New Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.2)'
+        required: true
+        type: string
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: utho/utho-cloud-controller-manager
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        run: |
+          VERSION="${{ inputs.version }}"
+          echo "Building version: $VERSION"
+          
+          # Build the Go binary
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -trimpath \
+            -ldflags "-s -w -X main.version=$VERSION" \
+            -o utho-cloud-controller-manager .
+          
+          # Build and push Docker image
+          docker build -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION .
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
+          
+          # Also tag as latest
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+      - name: Update version in latest.yml
+        run: |
+          VERSION="${{ inputs.version }}"
+          sed -i 's|\(utho/utho-cloud-controller-manager:\)[0-9]*\.[0-9]*\.[0-9]*|\1'"$VERSION"'|g' docs/releases/latest.yml
+
+      - name: Configure Git
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+
+      - name: Commit and push changes
+        run: |
+          VERSION="${{ inputs.version }}"
+          git add docs/releases/latest.yml
+          git commit -m "chore: bump version to $VERSION" || exit 0
+          git push
+
+      - name: Create and push tag
+        run: |
+          VERSION="${{ inputs.version }}"
+          git tag -a "v$VERSION" -m "Release version $VERSION"
+          git push origin "v$VERSION"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Release v${{ inputs.version }}
+          body: |
+            Release version ${{ inputs.version }}
+            
+            ## Changes
+            - Updated Docker image to version ${{ inputs.version }}
+            - Updated deployment manifests
+          draft: false
+          prerelease: false

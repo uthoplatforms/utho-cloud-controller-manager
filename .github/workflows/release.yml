@@ -8,6 +8,8 @@ on:
         required: true
         type: string
 
+run-name: Release v${{ inputs.version }}
+
 env:
   REGISTRY: docker.io
   IMAGE_NAME: utho/utho-cloud-controller-manager

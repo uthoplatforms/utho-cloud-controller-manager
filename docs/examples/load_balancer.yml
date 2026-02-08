@@ -21,6 +21,11 @@ metadata:
     # SSL certificate ID (required for enabling HTTPS)
     # This option only work for port 80 and 443
     # service.beta.kubernetes.io/utho-loadbalancer-ssl-id: "ssl-cert-id-12345"
+
+    # Network type for the load balancer; options: "private" or "public" (default: "public")
+    # When set to "private", enablepublicip will be set to false, otherwise true
+    # uncomment to use
+    # service.beta.kubernetes.io/utho-loadbalancer-network-type: "private"
 spec:
   type: LoadBalancer
   selector:

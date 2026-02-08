@@ -147,12 +147,13 @@ func (l *loadbalancers) EnsureLoadBalancer(ctx context.Context, clusterName stri
 // CreateUthoLoadBalancer sets up a LoadBalancer, its frontend, and backend configurations.
 func (l *loadbalancers) CreateUthoLoadBalancer(lbName, vpcId string, service *v1.Service, nodePoolId []string, clusterId string) (*utho.CreateLoadbalancerResponse, error) {
 	// Create LoadBalancer request parameters
+	enablePublicIP := getEnablePublicIP(service)
 	lbRequest := utho.CreateLoadbalancerParams{
 		Name:                lbName,
 		Dcslug:              l.zone,
 		Vpc:                 vpcId,
 		Type:                "network",
-		EnablePublicip:      "true",
+		EnablePublicip:      enablePublicIP,
 		Cpumodel:            "amd",
 		KubernetesClusterid: clusterId,
 	}
@@ -573,4 +574,19 @@ func getStickySessionEnabled(service *v1.Service) string {
 	}
 
 	return "0"
+}
+
+// getEnablePublicIP returns the enablepublicip value based on network type annotation
+// If network type is "private", returns "false", otherwise returns "true" (default)
+func getEnablePublicIP(service *v1.Service) string {
+	networkType, ok := service.Annotations[annoUthoNetworkType]
+	if !ok {
+		return "true"
+	}
+
+	if strings.EqualFold(networkType, "private") {
+		return "false"
+	}
+
+	return "true"
 }

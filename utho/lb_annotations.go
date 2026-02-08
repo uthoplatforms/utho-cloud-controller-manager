@@ -24,4 +24,8 @@ const (
 	// annoUthoLBSSLID is used to specify the SSL certificate ID for the load balancer.
 	// This is required when enabling HTTPS on a load balancer.
 	annoUthoLBSSLID = "service.beta.kubernetes.io/utho-loadbalancer-ssl-id"
+
+	// annoUthoNetworkType defines the network type for the load balancer.
+	// Accepted values: "private" or "public" (defaults to "public" if not specified).
+	annoUthoNetworkType = "service.beta.kubernetes.io/utho-loadbalancer-network-type"
 )
